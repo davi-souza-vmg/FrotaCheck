@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#123b35">
+  <meta name="description" content="Checklist digital de saída de veículos">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="../icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="../styles.css">
+  <title>Conferência | FrotaCheck</title>
+</head>
+<body>
+  <div id="offlineBanner" class="offline-banner" hidden>Você está offline. Os rascunhos ficam salvos neste aparelho.</div>
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark"><img src="../icons/icon-192.png" alt=""></div><div><strong>FrotaCheck</strong><small>Inspeção de saída</small></div></div>
+    <div class="header-right"><span id="connectionState" class="connection"><i></i> Online</span></div>
+  </header>
+
+  <main class="shell">
+    <section id="appView" hidden>
+      <div class="welcome-row">
+        <div><span class="eyebrow">PAINEL DA EQUIPE</span><h1>Consulta de formulários</h1><p class="muted">Consulte os formulários enviados pelos motoristas.</p></div>
+        
+      </div>
+      <div class="stats-grid">
+        <article class="stat-card"><span>Tudo certo</span><strong id="statTotal">0</strong><small>Finalizados sem pendências</small></article>
+        <article class="stat-card"><span>Com pendências</span><strong id="statDrafts">0</strong><small>Itens marcados como NÃO OK</small></article>
+        <article class="stat-card"><span>Total de checklists</span><strong id="statIssues">0</strong><small>Todos os registros recebidos</small></article>
+      </div>
+      <div class="content-heading"><div><h2>Todos os formulários</h2><p class="muted">Registros salvos neste dispositivo e enviados à nuvem.</p></div>
+        <div class="filter-wrap"><input id="historySearch" placeholder="Buscar veículo, destino..." aria-label="Buscar no histórico"><select id="historyFilter" aria-label="Filtrar histórico"><option value="all">Todos</option><option value="draft">Rascunhos</option><option value="pending">Pendentes de envio</option><option value="complete">Finalizados</option></select></div>
+      </div>
+      <div id="historyList" class="history-list"></div>
+      <div id="emptyHistory" class="empty-state"><div class="empty-icon">▤</div><h3>Nenhum checklist por aqui</h3><p>Comece registrando a próxima saída do veículo.</p><button class="btn btn-primary" id="emptyNewBtn">Atualizar lista</button></div>
+    </section>
+
+    <section id="formView" hidden>
+      <div class="form-top"><div class="save-state" id="saveState"></div></div>
+      <div class="form-heading"><div><span class="eyebrow">INSPEÇÃO DE SAÍDA</span><h1 id="formTitle">Novo checklist</h1><p class="muted">Preencha as informações e marque a condição de cada item.</p></div><div class="step-count" id="progressText">0% concluído</div></div>
+      <div class="progress-track"><div id="progressBar"></div></div>
+      <form id="checklistForm">
+        <section class="panel form-section">
+          <div class="section-title"><span class="section-number">01</span><div><h2>Identificação da viagem</h2><p>Dados do motorista e do veículo</p></div></div>
+          <div class="field-grid">
+            <label>Data e hora<input id="dateTime" name="dateTime" type="datetime-local" required></label>
+            <label>Motorista<input id="driver" name="driver" required placeholder="Nome completo"></label>
+            <label>Veículo / prefixo<input id="vehicle" name="vehicle" required placeholder="Ex.: 2524"></label>
+            <label>Tipo de veículo<select id="vehicleType" name="vehicleType"><option>Ônibus</option><option>Micro-ônibus</option><option>Van</option></select></label>
+            <label>KM inicial<input id="odometer" name="odometer" type="number" min="0" required placeholder="Ex.: 60305"></label>
+            <label>Origem<input id="origin" name="origin" required placeholder="Cidade ou local"></label>
+            <label>Destino<input id="destination" name="destination" required placeholder="Cidade ou local"></label>
+          </div>
+        </section>
+        <div id="checklistSections"></div>
+        <section class="panel form-section">
+          <div class="section-title"><span class="section-number">08</span><div><h2>Itens operacionais</h2><p>Conferência complementar do documento original</p></div></div>
+          <div id="operationalItems" class="item-list"></div>
+        </section>
+        <section class="panel form-section">
+          <div class="section-title"><span class="section-number">09</span><div><h2>Avarias e observações</h2><p>Registre detalhes e adicione fotos de referência</p></div></div>
+          <label>Descrição de avarias<textarea id="damageNotes" rows="3" placeholder="Ex.: risco nos retrovisores, amassados, trincas..."></textarea></label>
+          <div class="photo-head"><div><strong>Fotos das avarias</strong><p class="muted">Use a câmera do celular ou escolha uma imagem.</p></div><label class="btn btn-secondary photo-button">＋ Adicionar fotos<input id="photoInput" type="file" accept="image/*" capture="environment" multiple hidden></label></div>
+          <div id="photoGallery" class="photo-gallery"></div>
+          <label>Observações gerais<textarea id="generalNotes" rows="3" placeholder="Informações adicionais sobre a saída..."></textarea></label>
+        </section>
+        <div class="form-actions"><button id="clearFormBtn" type="button" class="btn btn-secondary">Limpar formulário</button><button id="finishBtn" type="button" class="btn btn-primary">Enviar formulário <span>→</span></button></div>
+        <p class="tiny-note">Ao enviar, o formulário será registrado na planilha para consulta da gerência.</p>
+      </form>
+    </section>
+
+    <section id="detailView" hidden>
+      <div class="form-top"><button id="detailBack" class="back-button">← Histórico</button><div id="detailStatus" class="status-pill"></div></div>
+      <div id="detailContent"></div>
+    </section>
+  </main>
+  <footer></footer>
+  <div id="photoPreviewModal" class="photo-preview-modal" hidden role="dialog" aria-modal="true" aria-labelledby="photoPreviewTitle">
+    <div class="photo-preview-backdrop"></div>
+    <section class="photo-preview-panel">
+      <header class="photo-preview-header">
+        <div class="photo-preview-heading"><span class="preview-eyebrow">FROTACHECK · GALERIA</span><strong id="photoPreviewTitle">Foto de avaria</strong></div>
+        <button id="photoPreviewClose" class="preview-close" type="button" aria-label="Fechar visualização">×</button>
+      </header>
+      <div class="photo-preview-stage">
+        <img id="photoPreviewImage" alt="Foto ampliada">
+        <div class="preview-hint">Use a roda do mouse ou os controles para ampliar · Arraste a imagem quando estiver ampliada</div>
+      </div>
+      <footer class="photo-preview-controls">
+        <button id="photoZoomOut" type="button" aria-label="Diminuir zoom" title="Diminuir zoom">−</button>
+        <span id="photoZoomValue" aria-live="polite">100%</span>
+        <button id="photoZoomIn" type="button" aria-label="Aumentar zoom" title="Aumentar zoom">＋</button>
+        <span class="preview-control-divider"></span>
+        <button id="photoZoomReset" type="button">Ajustar à tela</button>
+      </footer>
+    </section>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="actionConfirmModal" class="action-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="actionConfirmTitle"><div class="action-confirm-backdrop"></div><section class="action-confirm-card"><div class="action-confirm-icon">✓</div><h2 id="actionConfirmTitle">Confirmar ação</h2><p id="actionConfirmMessage"></p><div class="action-confirm-actions"><button id="actionConfirmCancel" type="button" class="btn btn-secondary">Cancelar</button><button id="actionConfirmYes" type="button" class="btn btn-primary">Confirmar</button></div></section></div>
+  <script src="../app.js"></script>
+</body>
+</html>
