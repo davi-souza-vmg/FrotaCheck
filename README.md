@@ -108,7 +108,7 @@ Observação: a sincronização automática não é um canal push instantâneo; 
 
 ## Refinamento visual do checklist e da Gerência
 
-- O checklist usa seletores segmentados com três estados independentes: ✕ Não OK (vermelho), / Não se aplica (neutro) e ✓ OK (verde), com transição curta ao selecionar.
+- O checklist usa seletores segmentados com três estados independentes: ✕ Não conforme (vermelho), / Não se aplica (neutro) e ✓ OK (verde), com transição curta ao selecionar.
 - O campo de observação de cada item aparece somente quando a resposta é `/` ou `✓`. Ao marcar `✕`, a observação daquele item é limpa.
 - As perguntas foram reescritas para que uma resposta positiva indique uma condição adequada do veículo.
 - As seções agora seguem uma numeração contínua: 01 Identificação, 02 a 07 inspeções, 08 Itens operacionais e 09 Avarias e observações. Os títulos usam o mesmo padrão visual.
@@ -128,3 +128,11 @@ Observação: a sincronização automática não é um canal push instantâneo; 
 2. Substitua o `Code.gs` do Apps Script por este arquivo e publique uma **Nova versão** da implantação Web App. A nova ação `getPhotos` é usada somente para carregar anexos; os detalhes textuais não dependem dela.
 3. Abra a Gerência com `Ctrl + F5` ou reabra o PWA após a publicação.
 4. Abra um checklist sem fotos e outro com fotos para confirmar que as informações aparecem imediatamente; no segundo, as fotos são carregadas depois.
+
+
+## Ajustes de texto e ordem do formulário
+
+- O título exibido no topo do formulário agora é apenas **Novo formulário**.
+- A seção 01 foi renomeada de “Identificação da viagem” para **Identificação**.
+- O campo **Fotos das avarias** e sua galeria aparecem abaixo de **Observações gerais**.
+- Na Gerência, o estado negativo é apresentado como **Não conforme**, em vez de “NÃO OK”. O valor interno salvo continua sendo `bad`, sem alterar a compatibilidade com registros já enviados.

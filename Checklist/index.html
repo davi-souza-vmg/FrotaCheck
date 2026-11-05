@@ -45,7 +45,7 @@
       <div class="progress-track"><div id="progressBar"></div></div>
       <form id="checklistForm">
         <section class="panel form-section">
-          <div class="section-title"><span class="section-number">01</span><div><h2>Identificação da viagem</h2><p>Dados do conferente e do veículo</p></div></div>
+          <div class="section-title"><span class="section-number">01</span><div><h2>Identificação</h2><p>Dados do conferente e do veículo</p></div></div>
           <div class="field-grid">
             <label>Data e hora<input id="dateTime" name="dateTime" type="datetime-local" required></label>
             <label>Conferente<input id="driver" name="driver" required placeholder="Nome completo"></label>
@@ -65,9 +65,9 @@
           <header class="check-section-head"><span class="section-number">09</span><div><h2>Avarias e observações</h2><p>Registre detalhes e adicione fotos de referência</p></div></header>
           <div class="special-section-body">
           <label>Descrição de avarias<textarea id="damageNotes" rows="3" placeholder="Ex.: risco nos retrovisores, amassados, trincas..."></textarea></label>
+          <label>Observações gerais<textarea id="generalNotes" rows="3" placeholder="Informações adicionais sobre a saída..."></textarea></label>
           <div class="photo-head"><div><strong>Fotos das avarias</strong><p class="muted">Use a câmera do celular ou escolha uma imagem.</p></div><button id="addPhotosBtn" type="button" class="btn btn-secondary photo-button" aria-haspopup="dialog">＋ Adicionar fotos</button><input id="photoInputCamera" type="file" accept="image/*" capture="environment" hidden><input id="photoInput" type="file" accept="image/*" multiple hidden></div>
           <div id="photoGallery" class="photo-gallery"></div>
-          <label>Observações gerais<textarea id="generalNotes" rows="3" placeholder="Informações adicionais sobre a saída..."></textarea></label>
           </div>
         </section>
         <div class="form-actions"><button id="clearFormBtn" type="button" class="btn btn-secondary">Limpar formulário</button><button id="finishBtn" type="button" class="btn btn-primary">Enviar formulário <span>→</span></button></div>
