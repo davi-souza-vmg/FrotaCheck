@@ -111,14 +111,14 @@ Observação: a sincronização automática não é um canal push instantâneo; 
 - O checklist usa seletores segmentados com três estados independentes: ✕ Não conforme (vermelho), / Não se aplica (neutro) e ✓ OK (verde), com transição curta ao selecionar.
 - O campo de observação de cada item aparece somente quando a resposta é `/` ou `✓`. Ao marcar `✕`, a observação daquele item é limpa.
 - As perguntas foram reescritas para que uma resposta positiva indique uma condição adequada do veículo.
-- As seções agora seguem uma numeração contínua: 01 Identificação, 02 a 07 inspeções, 08 Itens operacionais e 09 Avarias e observações. Os títulos usam o mesmo padrão visual.
+- As seções agora seguem uma numeração contínua: 01 Identificação, 02 a 07 inspeções (com todos os itens operacionais reunidos em 07 Operacional) e 08 Avarias e observações. Os títulos usam o mesmo padrão visual.
 - O layout mobile impede rolagem horizontal, mantém os três indicadores da Gerência alinhados na mesma fileira e simplifica os filtros.
 - Para a atualização rápida da Gerência, publique também o `Code.gs` atualizado. A ação `listMeta` passou a retornar os dados necessários aos cards sem baixar fotos em lote; as fotos continuam sendo obtidas ao abrir um registro. O frontend possui fallback para APIs antigas, mas esse fallback é mais lento.
 
 
 ## Correção da etiqueta de pendências e abertura dos detalhes
 
-- A etiqueta **Com pendências** agora usa fundo vermelho claro e texto vermelho, tanto na lista da Gerência quanto no cabeçalho dos detalhes.
+- A etiqueta **Com Avaria** usa fundo vermelho claro e texto vermelho, tanto na lista da Gerência quanto no cabeçalho dos detalhes. O indicador da Gerência usa o rótulo **Com Avarias**.
 - Ao abrir um checklist, a tela é montada imediatamente com os metadados já recebidos pela lista da Gerência (identificação, respostas e observações). A abertura não aguarda a leitura das imagens no Google Drive.
 - As fotos são solicitadas em uma chamada separada (`getPhotos`). Se a leitura das fotos falhar ou demorar, os dados do checklist continuam disponíveis e a tela informa apenas que as fotos não puderam ser carregadas.
 
@@ -136,3 +136,12 @@ Observação: a sincronização automática não é um canal push instantâneo; 
 - A seção 01 foi renomeada de “Identificação da viagem” para **Identificação**.
 - O campo **Fotos das avarias** e sua galeria aparecem abaixo de **Observações gerais**.
 - Na Gerência, o estado negativo é apresentado como **Não conforme**, em vez de “NÃO OK”. O valor interno salvo continua sendo `bad`, sem alterar a compatibilidade com registros já enviados.
+
+## Unificação da seção operacional e simplificação da Gerência
+
+- Os itens que antes apareciam em 07 Operacional e 08 Itens operacionais agora são apresentados juntos em uma única seção 07 Operacional. As chaves `opN` dos itens da antiga seção 08 foram mantidas, para que checklists antigos continuem exibindo suas respostas corretas.
+- A seção seguinte passou a ser 08 Avarias e observações.
+- O segundo indicador da Gerência foi renomeado para **Com Avarias**; as etiquetas dos registros com itens marcados como não conformes exibem **Com Avaria**.
+- O título principal de cada registro na lista mostra somente o veículo/prefixo; a linha abaixo mantém conferente e trajeto.
+- O filtro manual por status foi removido. A lista usa somente o campo de busca, que pesquisa veículo, prefixo, destino, origem e conferente.
+- Cada envio recebe um ID próprio. Portanto, vários checklists podem ser registrados para o mesmo veículo; um novo envio não substitui o anterior por ter o mesmo prefixo.

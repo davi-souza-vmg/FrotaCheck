@@ -28,11 +28,11 @@
       </div>
       <div class="stats-grid">
         <article class="stat-card"><span>Sem pendências</span><strong id="statTotal">0</strong></article>
-        <article class="stat-card"><span>Com pendências</span><strong id="statWithIssues">0</strong></article>
+        <article class="stat-card"><span>Com Avarias</span><strong id="statWithIssues">0</strong></article>
         <article class="stat-card"><span>Total</span><strong id="statIssues">0</strong></article>
       </div>
       <div class="content-heading"><div><h2>Todos os formulários</h2><p class="muted">Formulários enviados à nuvem.</p></div>
-        <div class="filter-wrap"><input id="historySearch" placeholder="Buscar veículo, destino..." aria-label="Buscar no histórico"><select id="historyFilter" aria-label="Filtrar histórico"><option value="all">Todos</option><option value="clean">Sem pendências</option><option value="issues">Com pendências</option></select></div>
+        <div class="filter-wrap"><input id="historySearch" placeholder="Buscar veículo, prefixo ou destino..." aria-label="Buscar por veículo, prefixo, conferente ou destino"></div>
       </div>
       <div id="historyLoading" class="loading-state">Buscando os checklists mais recentes…</div>
       <div id="historyList" class="history-list" hidden></div>
@@ -57,12 +57,8 @@
           </div>
         </section>
         <div id="checklistSections"></div>
-        <section class="check-group special-check-section operational-section">
-          <header class="check-section-head"><span class="section-number">08</span><div><h2>Itens operacionais</h2><p>Conferência complementar do veículo</p></div></header>
-          <div id="operationalItems" class="item-list operational-items-grid"></div>
-        </section>
         <section class="check-group special-check-section extra-notes-section">
-          <header class="check-section-head"><span class="section-number">09</span><div><h2>Avarias e observações</h2><p>Registre detalhes e adicione fotos de referência</p></div></header>
+          <header class="check-section-head"><span class="section-number">08</span><div><h2>Avarias e observações</h2><p>Registre detalhes e adicione fotos de referência</p></div></header>
           <div class="special-section-body">
           <label>Descrição de avarias<textarea id="damageNotes" rows="3" placeholder="Ex.: risco nos retrovisores, amassados, trincas..."></textarea></label>
           <label>Observações gerais<textarea id="generalNotes" rows="3" placeholder="Informações adicionais sobre a saída..."></textarea></label>

@@ -52,8 +52,12 @@ function renderCheckItem(item,key,valueData={}){
   return `<div class="check-item"><div class="item-name">${escapeHtml(item)}</div>${makeChoices(key,selected)}<div class="item-note" ${noteVisible?"":"hidden"}><input data-note="${key}" value="${escapeHtml(valueData.note||"")}" placeholder="Observação (opcional)" aria-label="Observação para ${escapeHtml(item)}"></div></div>`;
 }
 function renderCheckSections(data={}){
-  $("checklistSections").innerHTML=`<div class="check-groups">${GROUPS.map((g,gi)=>`<section class="check-group">${sectionHeader(gi+2,g.title)}<div class="item-list">${g.items.map((item,ii)=>{const key=`g${gi}_${ii}`,v=data.checks?.[key]||{};return renderCheckItem(item,key,v);}).join("")}</div></section>`).join("")}</div>`;
-  $("operationalItems").innerHTML=OPERATIONAL.map((item,i)=>{const key=`op${i}`,v=data.checks?.[key]||{};return renderCheckItem(item,key,v);}).join("");
+  $("checklistSections").innerHTML=`<div class="check-groups">${GROUPS.map((g,gi)=>{
+    const standardItems=g.items.map((item,ii)=>{const key=`g${gi}_${ii}`,v=data.checks?.[key]||{};return renderCheckItem(item,key,v);}).join("");
+    // Os itens operacionais usam as chaves opN para manter compatibilidade com registros já enviados.
+    const additionalOperationalItems=gi===5?OPERATIONAL.map((item,i)=>{const key=`op${i}`,v=data.checks?.[key]||{};return renderCheckItem(item,key,v);}).join(""):"";
+    return `<section class="check-group">${sectionHeader(gi+2,g.title)}<div class="item-list">${standardItems}${additionalOperationalItems}</div></section>`;
+  }).join("")}</div>`;
   document.querySelectorAll('#checklistForm input[type="radio"]').forEach(el=>el.addEventListener("change",()=>{
     const group=document.querySelectorAll(`input[name="${el.name}"]`);
     group.forEach(r=>r.closest(".choice")?.classList.toggle("is-selected",r.checked));
@@ -141,10 +145,9 @@ async function clearForm(){
 }
 function issuesFor(record){return Object.values(record.checks||{}).filter(item=>item?.value==="bad").length;}
 function renderHistory(){
-  const search=$("historySearch"),filterControl=$("historyFilter"),listEl=$("historyList"),emptyEl=$("emptyHistory"),loadingEl=$("historyLoading");
+  const search=$("historySearch"),listEl=$("historyList"),emptyEl=$("emptyHistory"),loadingEl=$("historyLoading");
   if(!listEl||!emptyEl)return;
   const query=(search?.value||"").trim().toLowerCase();
-  const filter=filterControl?.value||"all";
   const all=records.slice().sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
   const clean=all.filter(r=>issuesFor(r)===0);
   const withIssues=all.filter(r=>issuesFor(r)>0);
@@ -152,20 +155,19 @@ function renderHistory(){
   if($("statWithIssues"))$("statWithIssues").textContent=withIssues.length;
   if($("statIssues"))$("statIssues").textContent=all.length;
   const statCards=document.querySelectorAll(".stats-grid .stat-card");
-  const labels=["Sem pendências","Com pendências","Total"];
+  const labels=["Sem pendências","Com Avarias","Total"];
   statCards.forEach((card,index)=>{
     const label=card.querySelector("span");
     const description=card.querySelector("small");
     if(label)label.textContent=labels[index]||"";
     if(description)description.remove();
-    card.classList.toggle("is-active",(index===0&&filter==="clean")||(index===1&&filter==="issues")||(index===2&&filter==="all"));
+    card.classList.remove("is-active");
   });
   const visible=all.filter(r=>{
-    const matchesFilter=filter==="all"||(filter==="clean"&&issuesFor(r)===0)||(filter==="issues"&&issuesFor(r)>0);
     const haystack=[r.formType,r.vehicle,r.destination,r.origin,r.driver].join(" ").toLowerCase();
-    return matchesFilter&&haystack.includes(query);
+    return haystack.includes(query);
   });
-  listEl.innerHTML=visible.map(r=>`<article class="history-card"><div class="vehicle-icon" aria-hidden="true">▣</div><div class="history-main"><strong>${escapeHtml(r.formType||"Checklist")} · ${escapeHtml(r.vehicle||"Veículo sem prefixo")} · ${escapeHtml(r.destination||"Destino não informado")}</strong><p>${escapeHtml(r.driver||"Conferente")} · ${escapeHtml(r.origin||"Origem não informada")} → ${escapeHtml(r.destination||"")}</p></div><div class="history-meta"><span class="status-pill ${issuesFor(r)>0?"has-issues":escapeHtml(r.status||"complete")}">${issuesFor(r)>0?"Com pendências":"Finalizado"}</span><small>${displayDateTime(r.dateTime)} · ${Number.isFinite(r.photoCount)?r.photoCount:(r.photos||[]).length} foto(s)</small></div><div class="card-actions"><button class="mini-btn" data-open="${escapeHtml(r.id)}" type="button">Ver detalhes <span aria-hidden="true">→</span></button></div></article>`).join("");
+  listEl.innerHTML=visible.map(r=>`<article class="history-card"><div class="vehicle-icon" aria-hidden="true">▣</div><div class="history-main"><strong>${escapeHtml(r.vehicle||"Veículo sem prefixo")}</strong><p>${escapeHtml(r.driver||"Conferente")} · ${escapeHtml(r.origin||"Origem não informada")} → ${escapeHtml(r.destination||"")}</p></div><div class="history-meta"><span class="status-pill ${issuesFor(r)>0?"has-issues":escapeHtml(r.status||"complete")}">${issuesFor(r)>0?"Com Avaria":"Finalizado"}</span><small>${displayDateTime(r.dateTime)} · ${Number.isFinite(r.photoCount)?r.photoCount:(r.photos||[]).length} foto(s)</small></div><div class="card-actions"><button class="mini-btn" data-open="${escapeHtml(r.id)}" type="button">Ver detalhes <span aria-hidden="true">→</span></button></div></article>`).join("");
   const hasVisible=visible.length>0;
   listEl.hidden=!hasVisible;
   if(loadingEl)loadingEl.hidden=historyHasLoaded;
@@ -208,9 +210,11 @@ function renderDetail(r){
   activeId=String(r.id);
   const hasIssues=issuesFor(r)>0;
   $("detailStatus").className="status-pill "+(hasIssues?"has-issues":(r.status||"complete"));
-  $("detailStatus").textContent=hasIssues?"Com pendências":statusLabel(r);
-  const groups=GROUPS.map((g,gi)=>({title:g.title,items:g.items.map((name,ii)=>({name,...(r.checks||{})[`g${gi}_${ii}`]}))}));
-  groups.push({title:"Itens operacionais",items:OPERATIONAL.map((name,i)=>({name,...(r.checks||{})[`op${i}`]}))});
+  $("detailStatus").textContent=hasIssues?"Com Avaria":statusLabel(r);
+  const groups=GROUPS.map((g,gi)=>({title:g.title,items:[
+    ...g.items.map((name,ii)=>({name,...(r.checks||{})[`g${gi}_${ii}`]})),
+    ...(gi===5?OPERATIONAL.map((name,i)=>({name,...(r.checks||{})[`op${i}`]})):[])
+  ]}));
   const photoCount=Number(r.photoCount ?? (Array.isArray(r.photos)?r.photos.length:0))||0;
   const photoSection=photoCount>0
     ? `<section class="detail-group"><h3>Fotos anexadas (${photoCount})</h3><div id="detailPhotoArea">${Array.isArray(r.photos)&&r.photos.length?`<div class="detail-photos">${r.photos.map((p,i)=>`<img src="${p.data}" alt="${escapeHtml(p.name||"Foto de avaria "+(i+1))}" data-preview-photo tabindex="0" role="button" aria-label="Ampliar foto ${i+1}">`).join("")}</div>`:'<div class="detail-photo-state">Carregando fotos…</div>'}</div></section>`
@@ -320,8 +324,7 @@ $("photoInput").addEventListener("change",e=>{addPhotos(e.target.files);e.target
 })();
 if($("clearFormBtn")) $("clearFormBtn").onclick=clearForm;
 if($("refreshListBtn")) $("refreshListBtn").onclick=()=>loadCloudRecords({notify:true});
-const statCards=document.querySelectorAll(".stats-grid .stat-card"); if(statCards[0])statCards[0].onclick=()=>{$("historyFilter").value="clean";renderHistory();};if(statCards[1])statCards[1].onclick=()=>{$("historyFilter").value="issues";renderHistory();};if(statCards[2])statCards[2].onclick=()=>{$("historyFilter").value="all";renderHistory();};
-if($("historySearch"))$("historySearch").addEventListener("input",renderHistory);if($("historyFilter"))$("historyFilter").addEventListener("change",renderHistory);
+if($("historySearch"))$("historySearch").addEventListener("input",renderHistory);
 $("checklistForm").addEventListener("change",updateProgress);
 
 window.addEventListener("online",async()=>{setConnection();await loadCloudRecords();await refreshCloudChanges(true);});
