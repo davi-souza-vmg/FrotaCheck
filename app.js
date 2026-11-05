@@ -1,8 +1,6 @@
 /* FrotaCheck — interface com rascunhos locais e sincronização via Google Apps Script. */
 const STORAGE_KEY = "frotacheck.records.v1";
 const SESSION_KEY = "frotacheck.session.v2";
-const DRAFT_KEY = "frotacheck.draft.v1";
-let draftSaveTimer = null;
 const API_URL = "https://script.google.com/macros/s/AKfycbzZG4ax6WY_8tDxZpjcz_cvRpEoNLMLSPpPX0EywDqAsj_dni5O0UKgNjTtcqsXTuyATQ/exec";
 let authToken = null;
 let syncQueue = Promise.resolve();
@@ -40,11 +38,11 @@ function customConfirm(message,title="Confirmar ação",confirmLabel="Confirmar"
 function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),2600);}
 function setConnection(){const online=navigator.onLine;$("offlineBanner").hidden=online;$("connectionState").classList.toggle("offline",!online);$("connectionState").innerHTML=`<i></i>${online?"Online":"Offline"}`;}
 function statusLabel(r){return r.status==="complete"?"Finalizado":r.status==="pending"?"Pendente de envio":"Rascunho";}
-function makeChoices(name,value=""){return `<div class="item-options">${[["ok","OK"],["bad","Não OK"],["na","N/A"]].map(([v,label])=>`<label class="choice ${v==="bad"?"bad":""}"><input type="radio" name="${name}" value="${v}" ${value===v?"checked":""}><span>${label}</span></label>`).join("")}</div>`;}
+function makeChoices(name,value=""){return `<div class="item-options" role="group" aria-label="Avaliação">${[["bad","✕","Não OK"],["na","/","Não se aplica"],["ok","✓","OK"]].map(([v,glyph,label])=>`<label class="choice choice-${v} ${value===v?"is-selected":""}" title="${label}" aria-label="${label}"><input type="radio" name="${name}" value="${v}" ${value===v?"checked":""}><span>${glyph}</span></label>`).join("")}</div>`;}
 function renderCheckSections(data={}){
   $("checklistSections").innerHTML=`<div class="check-groups">${GROUPS.map((g,gi)=>`<section class="check-group"><div class="group-head">${String(gi+1).padStart(2,"0")} · ${g.title}</div><div class="item-list">${g.items.map((item,ii)=>{const key=`g${gi}_${ii}`,v=data.checks?.[key]||{};return `<div class="check-item"><div class="item-name">${item}</div>${makeChoices(key,v.value)}<div class="item-note"><input data-note="${key}" value="${escapeHtml(v.note||"")}" placeholder="Observação (opcional)"></div></div>`}).join("")}</div></section>`).join("")}</div>`;
   $("operationalItems").innerHTML=OPERATIONAL.map((item,i)=>{const key=`op${i}`,v=data.checks?.[key]||{};return `<div class="check-item"><div class="item-name">${item}</div>${makeChoices(key,v.value)}<div class="item-note"><input data-note="${key}" value="${escapeHtml(v.note||"")}" placeholder="${i===4?"Ex.: serão trocados": "Observação (opcional)"}"></div></div>`}).join("");
-  document.querySelectorAll('#checklistForm input[type="radio"]').forEach(el=>el.addEventListener("change",updateProgress));
+  document.querySelectorAll('#checklistForm input[type="radio"]').forEach(el=>el.addEventListener("change",()=>{updateProgress();document.querySelectorAll(`input[name="${el.name}"]`).forEach(r=>r.closest(".choice")?.classList.toggle("is-selected",r.checked));}));
 }
 function collectChecks(){const checks={};document.querySelectorAll('#checklistForm input[type="radio"]:checked').forEach(el=>{checks[el.name]??={};checks[el.name].value=el.value;});document.querySelectorAll('#checklistForm [data-note]').forEach(el=>{const key=el.dataset.note;checks[key]??={};checks[key].note=el.value;});return checks;}
 function completedCount(){const checked=document.querySelectorAll('#checklistForm input[type="radio"]:checked').length;const total=document.querySelectorAll('#checklistForm input[type="radio"][value="ok"]').length;return {checked,total};}
@@ -57,7 +55,7 @@ function fillForm(r){
   $("dateTime").value=r?.dateTime||nowLocal();$("driver").value=r?.driver||"";$("vehicle").value=r?.vehicle||"";$("vehicleType").value=r?.vehicleType||"Ônibus";$("odometer").value=r?.odometer||"";$("origin").value=r?.origin||"";$("destination").value=r?.destination||"";$("damageNotes").value=r?.damageNotes||"";$("generalNotes").value=r?.generalNotes||"";
   renderCheckSections(r||{});renderPhotos();updateProgress();if($("saveState")) $("saveState").textContent="";showView("formView");
 }
-function renderPhotos(){$("photoGallery").innerHTML=photos.map((p,i)=>`<div class="photo-card"><img src="${p.data}" alt="${escapeHtml(p.name||"Foto de avaria "+(i+1))}" data-preview-photo tabindex="0" role="button" aria-label="Ampliar foto ${i+1}"><button type="button" aria-label="Remover foto" data-remove-photo="${i}">×</button></div>`).join("");document.querySelectorAll("[data-remove-photo]").forEach(b=>b.onclick=()=>{photos.splice(Number(b.dataset.removePhoto),1);renderPhotos();autoSaveDraft();});bindPhotoPreviews($("photoGallery"));}
+function renderPhotos(){$("photoGallery").innerHTML=photos.map((p,i)=>`<div class="photo-card"><img src="${p.data}" alt="${escapeHtml(p.name||"Foto de avaria "+(i+1))}" data-preview-photo tabindex="0" role="button" aria-label="Ampliar foto ${i+1}"><button type="button" aria-label="Remover foto" data-remove-photo="${i}">×</button></div>`).join("");document.querySelectorAll("[data-remove-photo]").forEach(b=>b.onclick=()=>{photos.splice(Number(b.dataset.removePhoto),1);renderPhotos();});bindPhotoPreviews($("photoGallery"));}
 let previewZoom=1, previewX=0, previewY=0, previewDragging=false, previewStartX=0, previewStartY=0, previewOriginX=0, previewOriginY=0;
 function bindPhotoPreviews(root=document){
   root.querySelectorAll("img[data-preview-photo]").forEach(img=>{
@@ -109,35 +107,11 @@ $("photoPreviewImage").addEventListener("pointermove",e=>{
 $("photoPreviewImage").addEventListener("pointerup",()=>{previewDragging=false;applyPhotoZoom();});
 $("photoPreviewImage").addEventListener("pointercancel",()=>{previewDragging=false;applyPhotoZoom();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("photoPreviewModal").hidden)closePhotoPreview();});
-async function addPhotos(filesList){for(const file of Array.from(filesList)){if(!file.type.startsWith("image/"))continue;try{const data=await compressImage(file);photos.push({name:file.name||"avaria.jpg",type:"image/jpeg",data});}catch{toast("Não foi possível carregar uma das fotos.");}}renderPhotos();autoSaveDraft();}
+async function addPhotos(filesList){for(const file of Array.from(filesList)){if(!file.type.startsWith("image/"))continue;try{const data=await compressImage(file);photos.push({name:file.name||"avaria.jpg",type:"image/jpeg",data});}catch{toast("Não foi possível carregar uma das fotos.");}}renderPhotos();}
 function compressImage(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const max=1400,scale=Math.min(1,max/Math.max(img.width,img.height)),canvas=document.createElement("canvas");canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL("image/jpeg",.76));};img.src=reader.result;};reader.readAsDataURL(file);});}
-function saveRecord(status){const r=formData();r.status=status;r.updatedAt=new Date().toISOString();if(status==="complete")r.completedAt=new Date().toISOString();const i=records.findIndex(x=>x.id===r.id);if(i>=0)records[i]=r;else records.unshift(r);activeId=r.id;persist();renderHistory();$("saveState").textContent=status==="complete"?"Finalizado neste aparelho":"Rascunho salvo neste aparelho";toast(navigator.onLine?"Salvo neste aparelho; sincronizando…":"Salvo neste aparelho. Será sincronizado quando houver conexão.");r.cloudSynced=false;const savedIndex=records.findIndex(x=>x.id===r.id);if(savedIndex>=0)records[savedIndex].cloudSynced=false;persist();if(navigator.onLine)syncRecord(r);return r;}
-function autoSaveDraft(){
-  if($("formView").hidden || isEntryRoute===false) return;
-  clearTimeout(draftSaveTimer);
-  draftSaveTimer=setTimeout(()=>{try{const r=formData();r.status="draft";r.id="local-draft-"+formType.toLowerCase();localStorage.setItem(DRAFT_KEY+":"+formType.toLowerCase(),JSON.stringify(r));}catch(e){console.warn("Não foi possível salvar o rascunho local",e);}},150);
-}
-function clearLocalDraft(){try{localStorage.removeItem(DRAFT_KEY+":"+formType.toLowerCase());}catch{}}
-async function clearForm(){if(!await customConfirm("Isso vai apagar todos os campos preenchidos e excluir o rascunho salvo neste aparelho. Esta ação não pode ser desfeita.","Limpar formulário","Limpar tudo"))return;const driver=$("driver").value;clearLocalDraft();activeId=null;photos=[];$("checklistForm").reset();fillForm(null);$("driver").value=driver;renderPhotos();toast("Formulário e rascunho limpos.");}
-function canViewRecord(r){ return true; }
-function renderHistory(){
-  const query=$("historySearch").value.trim().toLowerCase(),filter=$("historyFilter").value;
-  const visible=records.filter(canViewRecord);
-  const mine=visible.filter(r=>r.owner===(currentUser?.username||""));
-  const issuesFor=r=>Object.values(r.checks||{}).filter(c=>c.value==="bad").length;
-  const withIssues=visible.filter(r=>issuesFor(r)>0), good=visible.filter(r=>r.status==="complete"&&issuesFor(r)===0);
-  $("statTotal").textContent=good.length;$("statDrafts").textContent=withIssues.length;$("statIssues").textContent=visible.length;
-  const statCards=document.querySelectorAll(".stats-grid .stat-card"); if(statCards.length===3){statCards[0].querySelector("span").textContent="Tudo certo";statCards[0].querySelector("small").textContent="Finalizados sem pendências · clique para filtrar";statCards[1].querySelector("span").textContent="Com pendências";statCards[1].querySelector("small").textContent="Itens marcados como NÃO OK · clique para filtrar";statCards[2].querySelector("span").textContent="Total de checklists";statCards[2].querySelector("small").textContent="Todos os registros recebidos";}
-  const list=visible.filter(r=>(filter==="all"||(filter==="draft"&&r.status==="complete"&&issuesFor(r)===0)||(filter==="pending"&&issuesFor(r)>0)||(filter==="complete"&&r.status==="complete"))&&(`${r.vehicle} ${r.destination} ${r.origin} ${r.driver}`.toLowerCase().includes(query))).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
-  const allMode=true;
-  document.querySelector(".content-heading h2").textContent=allMode?"Todos os checklists":"Meus checklists";
-  document.querySelector(".content-heading .muted").textContent=allMode?"Consulte os registros de toda a frota. A lista se atualiza automaticamente.":"Registros criados por você. A lista se atualiza automaticamente.";
-  document.querySelector(".stats-grid .stat-card:first-child span").textContent="Sem pendências";
-  document.querySelector(".stats-grid .stat-card:first-child small").textContent="Finalizados sem pendências · clique para filtrar";
-  $("historyList").innerHTML=list.map(r=>`<article class="history-card"><div class="vehicle-icon">▣</div><div class="history-main"><strong>${escapeHtml(r.formType||"Checklist")} · ${escapeHtml(r.vehicle||"Veículo sem prefixo")} · ${escapeHtml(r.destination||"Destino não informado")}</strong><p>${escapeHtml(r.driver||"Conferente")} · ${escapeHtml(r.origin||"Origem não informada")} → ${escapeHtml(r.destination||"")}</p></div><div class="history-meta"><span class="status-pill ${r.status}">${statusLabel(r)}</span><small>${displayDateTime(r.dateTime)} · ${Number.isFinite(r.photoCount)?r.photoCount:(r.photos||[]).length} foto(s)</small></div><div class="card-actions"><button class="mini-btn" data-open="${escapeHtml(r.id)}">Abrir</button></div></article>`).join("");
-  $("emptyHistory").hidden=list.length>0;$("historyList").hidden=list.length===0;
-  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openDetail(b.dataset.open));
-}
+function saveRecord(status){const r=formData();r.status=status;r.updatedAt=new Date().toISOString();if(status==="complete")r.completedAt=new Date().toISOString();const i=records.findIndex(x=>x.id===r.id);if(i>=0)records[i]=r;else records.unshift(r);activeId=r.id;persist();renderHistory();$("saveState").textContent=status==="complete"?"Finalizado neste aparelho":"Formulário salvo";toast(navigator.onLine?"Salvo neste aparelho; sincronizando…":"Salvo neste aparelho. Será sincronizado quando houver conexão.");r.cloudSynced=false;const savedIndex=records.findIndex(x=>x.id===r.id);if(savedIndex>=0)records[savedIndex].cloudSynced=false;persist();if(navigator.onLine)syncRecord(r);return r;}
+function autoSaveDraft(){}
+function clearLocalDraft(){}
 
 function openDetail(id){const r=records.find(x=>x.id===id);if(!r)return;activeId=id;$("detailStatus").className="status-pill "+r.status;$("detailStatus").textContent=statusLabel(r);
   const groups=GROUPS.map((g,gi)=>({title:g.title,items:g.items.map((name,ii)=>({name,...(r.checks||{})[`g${gi}_${ii}`]}))}));
@@ -265,7 +239,7 @@ async function syncRecordNow(record){
         }
         persist();
       }
-      $("saveState").textContent=record.status==="complete"?"Finalizado e sincronizado":"Rascunho sincronizado";
+      $("saveState").textContent=record.status==="complete"?"Finalizado e sincronizado":"Formulário sincronizado";
       toast("Checklist sincronizado com a planilha.");
       setTimeout(()=>refreshCloudChanges(true),300);
     }
@@ -278,7 +252,7 @@ async function syncRecordNow(record){
 
 $("detailBack").onclick=()=>{showView("appView");renderHistory();};
 
-$("finishBtn").onclick=async()=>{if(!await customConfirm("Depois de enviar, este checklist será registrado para consulta da gerência. Confira os dados antes de continuar.","Enviar formulário","Enviar agora"))return;const required=["driver","vehicle","dateTime","odometer","origin","destination"];for(const id of required){if(!$(id).value.trim()){ $(id).focus();toast("Preencha os campos obrigatórios antes de finalizar.");return;}}const missing=document.querySelectorAll('#checklistForm input[type="radio"][value="ok"]').length-document.querySelectorAll('#checklistForm input[type="radio"]:checked').length;if(missing>0&&!await customConfirm(`Ainda há ${missing} item(ns) sem avaliação. Deseja finalizar mesmo assim?`,"Itens sem avaliação","Finalizar mesmo assim"))return;const issues=Object.values(collectChecks()).filter(c=>c.value==="bad").length;if(issues&&!await customConfirm(`Foram marcados ${issues} item(ns) como NÃO OK. Confirma a finalização e o registro das não conformidades?`,"Itens com pendência","Confirmar envio"))return;const submitted=formData();submitted.status="complete";submitted.completedAt=new Date().toISOString();submitted.updatedAt=new Date().toISOString();const button=$("finishBtn");button.disabled=true;button.innerHTML='<span class="spinner"></span> Enviando formulário…';document.body.classList.add("is-sending");apiRequest({action:"publicSave",record:submitted}).then(()=>{document.body.classList.remove("is-sending");toast("Formulário enviado! Preparando um novo formulário…");const savedDriver=$("driver").value;clearLocalDraft();activeId=null;photos=[];$("checklistForm").reset();fillForm(null);$("driver").value=savedDriver;button.disabled=false;button.innerHTML='Enviar formulário <span>→</span>';window.scrollTo({top:0,behavior:"smooth"});}).catch(err=>{document.body.classList.remove("is-sending");toast("Não foi possível enviar: "+err.message);button.disabled=false;button.innerHTML="Enviar formulário <span>→</span>";});};
+$("finishBtn").onclick=async()=>{if(!await customConfirm("Depois de enviar, este checklist será registrado para consulta da gerência. Confira os dados antes de continuar.","Enviar formulário","Enviar agora"))return;const required=["driver","vehicle","dateTime","odometer","origin","destination"];for(const id of required){if(!$(id).value.trim()){ $(id).focus();toast("Preencha os campos obrigatórios antes de finalizar.");return;}}const missing=document.querySelectorAll('#checklistForm input[type="radio"][value="ok"]').length-document.querySelectorAll('#checklistForm input[type="radio"]:checked').length;if(missing>0&&!await customConfirm(`Ainda há ${missing} item(ns) sem avaliação. Deseja finalizar mesmo assim?`,"Itens sem avaliação","Finalizar mesmo assim"))return;const issues=Object.values(collectChecks()).filter(c=>c.value==="bad").length;if(issues&&!await customConfirm(`Foram marcados ${issues} item(ns) como NÃO OK. Confirma a finalização e o registro das não conformidades?`,"Itens com pendência","Confirmar envio"))return;const submitted=formData();submitted.status="complete";submitted.completedAt=new Date().toISOString();submitted.updatedAt=new Date().toISOString();const button=$("finishBtn");button.disabled=true;button.innerHTML='<span class="spinner"></span> Enviando formulário…';document.body.classList.add("is-sending");apiRequest({action:"publicSave",record:submitted}).then(()=>{document.body.classList.remove("is-sending");toast("Formulário enviado! Preparando um novo formulário…");const savedDriver=$("driver").value;activeId=null;photos=[];$("checklistForm").reset();fillForm(null);$("driver").value=savedDriver;button.disabled=false;button.innerHTML='Enviar formulário <span>→</span>';window.scrollTo({top:0,behavior:"smooth"});}).catch(err=>{document.body.classList.remove("is-sending");toast("Não foi possível enviar: "+err.message);button.disabled=false;button.innerHTML="Enviar formulário <span>→</span>";});};
 $("photoInput").addEventListener("change",e=>{addPhotos(e.target.files);e.target.value="";});
 /* Adicionar fotos: no celular pergunta Câmera ou Arquivos; no computador abre direto a escolha de arquivos */
 (function(){
@@ -299,7 +273,7 @@ if($("clearFormBtn")) $("clearFormBtn").onclick=clearForm;
 if($("refreshListBtn")) $("refreshListBtn").onclick=()=>loadCloudRecords();
 const statCards=document.querySelectorAll(".stats-grid .stat-card"); if(statCards[0])statCards[0].onclick=()=>{$("historyFilter").value="draft";renderHistory();};if(statCards[1])statCards[1].onclick=()=>{$("historyFilter").value="pending";renderHistory();};if(statCards[2])statCards[2].onclick=()=>{$("historyFilter").value="all";renderHistory();};
 $("historySearch").addEventListener("input",renderHistory);$("historyFilter").addEventListener("change",renderHistory);
-$("checklistForm").addEventListener("change",()=>{updateProgress();autoSaveDraft();});
+$("checklistForm").addEventListener("change",()=>{updateProgress();});
 $("checklistForm").addEventListener("input",autoSaveDraft);
 
 window.addEventListener("online",async()=>{setConnection();await syncPendingRecords();await loadCloudRecords();await refreshCloudChanges(true);});
@@ -311,8 +285,7 @@ loadRecords();setConnection();startRealtimeSync();
 currentUser={username:"público",name:"Conferente",role:"admin",roleLabel:"Consulta pública"};
 if(isEntryRoute){
   $("appView").hidden=true;
-  let savedDraft=null;try{savedDraft=JSON.parse(localStorage.getItem(DRAFT_KEY+":"+formType.toLowerCase())||"null");}catch{}
-  fillForm(savedDraft);
+  fillForm(null);
   document.querySelector(".form-heading .eyebrow").textContent=formType.toUpperCase();
   $("formTitle").textContent="Novo formulário · "+formType;
 }else{
