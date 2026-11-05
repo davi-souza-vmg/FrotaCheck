@@ -209,22 +209,40 @@ async function loadDetailPhotos(id){
 let busCurrentView = "side";
 const BUS_VIEW_TITLES = {front:"Frente",side:"Lateral",rear:"Traseira"};
 const BUS_CHECK_MARKS = {
-  g0_0:{label:"Lataria",points:{side:[[580,190]],front:[[320,330]],rear:[[320,330]]}},
-  g0_1:{label:"Retrovisores",points:{side:[[132,145]],front:[[88,188],[552,188]]}},
+  g0_0:{label:"Lataria",points:{side:[[580,242]],front:[[320,330]],rear:[[320,330]]}},
+  g0_1:{label:"Retrovisores",points:{side:[[104,162]],front:[[88,188],[552,188]]}},
   g0_2:{label:"Vidros e para-brisa",points:{side:[[470,128]],front:[[320,144]],rear:[[320,140]]}},
   g0_3:{label:"Vazamento aparente",points:{side:[[535,333]],front:[[320,365]],rear:[[320,365]]}},
   g0_4:{label:"Portas",points:{side:[[420,222]]}},
   g1_0:{label:"Pneus",points:{side:[[295,315],[790,315]]}},
   g1_1:{label:"Rodas",points:{side:[[295,315],[790,315]]}},
-  g1_2:{label:"Estepe",points:{rear:[[500,335]]}},
+  g1_2:{label:"Estepe",points:{side:[[875,282]],rear:[[500,335]]}},
   g2_0:{label:"Faróis",points:{front:[[190,303],[450,303]]}},
   g2_1:{label:"Setas e pisca-alerta",points:{front:[[130,292],[510,292]],rear:[[164,282],[476,282]]}},
   g2_2:{label:"Luzes de freio",points:{rear:[[170,294],[470,294]]}},
   g2_3:{label:"Lanternas",points:{rear:[[165,270],[475,270]]}},
+  g3_0:{label:"Freios",points:{side:[[295,315],[790,315]],front:[[190,340],[450,340]],rear:[[190,340],[450,340]]}},
+  g3_4:{label:"Saídas de emergência",points:{side:[[620,155]]}},
+  g4_1:{label:"Buzina",points:{front:[[320,315]]}},
+  g4_2:{label:"Ventilação",points:{side:[[840,225]]}},
+  g4_3:{label:"Ruídos do motor",points:{side:[[865,245]],rear:[[500,300]]}},
+  g5_0:{label:"Combustível",points:{side:[[735,245]]}},
+  g5_2:{label:"Limpeza da carroceria",points:{side:[[580,242]]}},
+  op0:{label:"Chave da porta",points:{side:[[420,232]]}},
   op1:{label:"Trava da porta",points:{side:[[425,222]]}},
+  op2:{label:"Tampa do tanque",points:{side:[[735,245]]}},
+  op3:{label:"Tanque de combustível",points:{side:[[735,245]]}},
   op4:{label:"Pneus operacionais",points:{side:[[295,315],[790,315]]}},
-  op7:{label:"Estepe",points:{rear:[[500,335]]}},
-  op15:{label:"Placa",points:{front:[[420,350]],rear:[[420,354]]}}
+  op5:{label:"Tanque de ARLA",points:{side:[[780,245]]}},
+  op6:{label:"Chave do tanque de ARLA",points:{side:[[780,245]]}},
+  op7:{label:"Estepe",points:{side:[[875,282]],rear:[[500,335]]}},
+  op8:{label:"Macaco",points:{side:[[865,278]]}},
+  op9:{label:"Chave de roda",points:{side:[[865,278]]}},
+  op10:{label:"Triângulo",points:{side:[[865,278]],rear:[[500,335]]}},
+  op12:{label:"Trava do bagageiro do estepe",points:{side:[[875,282]]}},
+  op13:{label:"Filtro de combustível",points:{side:[[875,245]]}},
+  op14:{label:"Filtro de ar",points:{side:[[875,245]]}},
+  op15:{label:"Placa",points:{front:[[320,350]],rear:[[320,350]]}}
 };
 function normalizeMapText(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();}
 function addBusMapMarker(views,view,issue,x,y,approximate=false){
@@ -261,7 +279,7 @@ function collectBusMapData(record){
     if(!targetViews.length)targetViews.push("side");
     const issue={key:"manual-damage",title:"Avaria descrita",description:damageText};
     allIssues.push(issue);
-    const defaultPoints={front:[[320,330]],side:[[585,190]],rear:[[320,330]]};
+    const defaultPoints={front:[[320,330]],side:[[585,242]],rear:[[320,330]]};
     [...new Set(targetViews)].forEach(view=>{
       const points=defaultPoints[view]||defaultPoints.side;
       points.forEach(([x,y])=>addBusMapMarker(views,view,issue,x,y,true));
@@ -269,44 +287,104 @@ function collectBusMapData(record){
   }
   return {views,allIssues,unmapped,damageText};
 }
+function renderBusDamageRegions(view,markers){
+  const keys=new Set((markers||[]).flatMap(marker=>marker.keys||[marker.key]));
+  const has=(...names)=>names.some(name=>keys.has(name));
+  const manualText=normalizeMapText((markers||[]).filter(marker=>(marker.keys||[marker.key]).includes("manual-damage")).map(marker=>marker.description).join(" "));
+  const manual=keys.has("manual-damage");
+  const manualWheel=manual&&/(pneu|roda)/.test(manualText);
+  const manualDoor=manual&&/porta/.test(manualText);
+  const manualMirror=manual&&/retrovisor/.test(manualText);
+  const manualGlass=manual&&/(vidro|janela|para-?brisa)/.test(manualText);
+  const manualLight=manual&&/(farol|lanterna|seta|pisca|luz de freio)/.test(manualText);
+  const manualTank=manual&&/(tanque|combustivel|arla)/.test(manualText);
+  const manualSpare=manual&&/(estepe|macaco|triangulo|chave de roda)/.test(manualText);
+  const manualBody=manual&&!manualWheel&&!manualDoor&&!manualMirror&&!manualGlass&&!manualLight&&!manualTank&&!manualSpare;
+  const area=(d,extra="")=>`<path class="bus-damage-area" d="${d}" fill="#e52b32" fill-opacity=".43" stroke="#c71927" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke" ${extra}/>`;
+  const ellipse=(cx,cy,rx,ry)=>`<ellipse class="bus-damage-area" cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#e52b32" fill-opacity=".43" stroke="#c71927" stroke-width="2.2" vector-effect="non-scaling-stroke"/>`;
+  let html="";
+  if(view==="side"){
+    if(has("g0_0","g5_2")||manualBody){
+      html+=area("M101 207H929L931 257H98Z M97 260H159V303Q153 319 118 321Q91 318 93 292Z M347 260H738V321H347Z M842 260H931L936 292Q936 316 905 321H842Z","data-damage-region=\"lataria\"");
+    }
+    if(has("g0_1")||manualMirror) html+=`<path class="bus-damage-area" d="M106 145 82 132Q75 129 72 139L70 174Q72 186 82 181L109 169Z" fill="#e52b32" fill-opacity=".43" stroke="#c71927" stroke-width="2.2" data-damage-region="retrovisor"/>`;
+    if(has("g0_2","g3_4")||manualGlass){
+      html+=area("M124 119Q148 96 212 91L270 88 251 202H104L107 153Q109 132 124 119Z M279 88H355V202H265Z M365 88H447V202H365Z M457 88H539V202H457Z M549 88H631V202H549Z M641 88H723V202H641Z M733 88H813V202H733Z M822 107H886Q902 123 909 158L913 202H822Z","fill-rule=\"evenodd\" data-damage-region=\"vidros\"");
+    }
+    if(has("g0_3")) html+=ellipse(535,330,44,12);
+    if(has("g0_4","op0","op1")||manualDoor) html+=area("M348 210H438V258H348Z","data-damage-region=\"porta\"");
+    if(has("g1_0","g1_1","g3_0","op4")||manualWheel){
+      html+=ellipse(295,310,47,47)+ellipse(790,310,47,47);
+    }
+    if(has("g1_2","op7","op8","op9","op10","op12")||manualSpare) html+=area("M842 257H919V302H842Z","data-damage-region=\"compartimento-estepe\"");
+    if(has("op2","op3","op5","op6")||manualTank) html+=area("M704 220H801V257H704Z","data-damage-region=\"tanques\"");
+    if(has("op13","op14","g4_3")) html+=area("M858 207H919L929 257H858Z","data-damage-region=\"compartimento-motor\"");
+    if(has("g4_2")) html+=area("M812 211H850V251H812Z","data-damage-region=\"ventilacao\"");
+  }else if(view==="front"){
+    if(has("g0_0")||manualBody) html+=area("M116 253H524L525 329Q522 366 495 376H145Q118 366 115 329Z","data-damage-region=\"lataria-frontal\"");
+    if(has("g0_1")||manualMirror) html+=`<path class="bus-damage-area" d="M95 145 68 126Q58 120 55 131L55 188Q58 202 70 196L105 183Z M545 145 572 126Q582 120 585 131L585 188Q582 202 570 196L535 183Z" fill="#e52b32" fill-opacity=".43" stroke="#c71927" stroke-width="2.2" data-damage-region="retrovisores"/>`;
+    if(has("g0_2")||manualGlass) html+=area("M135 139Q146 91 190 85Q320 54 450 85Q494 91 505 139L492 253H148Z","data-damage-region=\"para-brisa\"");
+    if(has("g0_3")) html+=ellipse(320,370,90,9);
+    if(has("g2_0","g2_1")||manualLight) html+=area("M121 284Q142 267 174 278L192 315 129 322Z M519 284Q498 267 466 278L448 315 511 322Z","data-damage-region=\"farois\"");
+    if(has("g4_1")) html+=area("M190 326Q320 340 450 326L438 343H202Z","data-damage-region=\"grade-frontal\"");
+    if(has("op15")||(manual&&/placa/.test(manualText))) html+=`<rect class="bus-damage-area" x="260" y="339" width="120" height="27" rx="4" fill="#e52b32" fill-opacity=".43" stroke="#c71927" stroke-width="2.2" data-damage-region="placa"/>`;
+    if(has("g1_0","g1_1","g3_0","op4")) html+=area("M113 324Q150 354 206 352L205 372H142Q120 367 113 349Z M434 352Q490 354 527 324L527 349Q520 369 497 372H435Z","data-damage-region=\"rodas-dianteiras\"");
+  }else{
+    if(has("g0_0")||manualBody) html+=area("M120 244H520V350Q516 373 492 378H148Q124 373 120 350Z","data-damage-region=\"lataria-traseira\"");
+    if(has("g0_2")||manualGlass) html+=area("M151 91H489V228H151Z","data-damage-region=\"vidro-traseiro\"");
+    if(has("g0_3")) html+=ellipse(320,366,100,9);
+    if(has("g1_2","op7","op10")||manualSpare) html+=area("M245 284H395V323H245Z","data-damage-region=\"compartimento-estepe\"");
+    if(has("g2_1","g2_2","g2_3")||manualLight) html+=area("M132 256H161V327H132Z M479 256H508V327H479Z","data-damage-region=\"lanternas-traseiras\"");
+    if(has("op15")||(manual&&/placa/.test(manualText))) html+=`<rect class="bus-damage-area" x="260" y="334" width="120" height="27" rx="4" fill="#e52b32" fill-opacity=".43" stroke="#c71927" stroke-width="2.2" data-damage-region="placa"/>`;
+    if(has("g3_0")) html+=area("M118 342H522V360Q516 373 492 378H148Q124 373 120 360Z","data-damage-region=\"freios-traseiros\"");
+    if(has("g4_3")) html+=area("M165 236H475V254H165Z","data-damage-region=\"compartimento-motor-traseiro\"");
+  }
+  return html?`<g class="bus-damage-regions">${html}</g>`:"";
+}
 function renderBusSvg(view,record,markers){
   const prefix=escapeHtml(record.vehicle||"—");
   const plate=escapeHtml(record.plate||"PLACA NÃO INFORMADA");
-  const prefixSize=prefix.length>4?29:37;
+  const prefixSize=Math.min(31,Math.max(19,126/Math.max(prefix.length,1)));
   const defs=`<defs>
-    <linearGradient id="busBody" x1="0" y1="0" x2="0.15" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e7eeeb"/></linearGradient>
-    <linearGradient id="busGlass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#334c5b"/><stop offset=".52" stop-color="#142631"/><stop offset="1" stop-color="#0b1720"/></linearGradient>
-    <linearGradient id="busNavy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#153b7e"/><stop offset="1" stop-color="#071d4c"/></linearGradient>
+    <linearGradient id="busBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FCFEFD"/><stop offset="1" stop-color="#FCFEFD"/></linearGradient>
+    <linearGradient id="busGlass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b5664"/><stop offset=".48" stop-color="#182c37"/><stop offset="1" stop-color="#091721"/></linearGradient>
+    <linearGradient id="busNavy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#173e82"/><stop offset="1" stop-color="#071d4c"/></linearGradient>
     <linearGradient id="busOrange" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff7a00"/><stop offset="1" stop-color="#f04a13"/></linearGradient>
+    <linearGradient id="wheelMetal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e4ebe8"/><stop offset="1" stop-color="#899895"/></linearGradient>
     <filter id="busShadow" x="-20%" y="-30%" width="140%" height="180%"><feGaussianBlur stdDeviation="9"/></filter>
   </defs>`;
   let body="";
   if(view==="side"){
-    body=`<svg class="bus-svg bus-svg-side" viewBox="0 0 1000 420" role="img" aria-label="Ônibus em vista lateral, prefixo ${prefix}, placa ${plate}">
+    body=`<svg class="bus-svg bus-svg-side" viewBox="0 0 1000 390" role="img" aria-label="Ônibus em vista lateral, prefixo ${prefix}, placa ${plate}">
       ${defs}<ellipse cx="505" cy="365" rx="420" ry="22" fill="#243b34" opacity=".16" filter="url(#busShadow)"/>
       <path d="M93 292 96 157Q99 119 139 104L210 80Q255 66 333 66H838Q903 68 925 126L938 277Q938 309 905 321H118Q89 319 93 292Z" fill="url(#busBody)" stroke="#b9c7c2" stroke-width="3"/>
       <path d="M96 258H931L936 292Q936 316 905 321H118Q91 318 93 292Z" fill="url(#busNavy)"/>
+      <path d="M96 257H931" stroke="#e9f0ed" stroke-width="3" opacity=".92"/>
       <path d="M812 76 865 79 922 132 930 162 895 153 851 108Z" fill="url(#busOrange)"/>
       <path d="M124 119Q148 96 212 91L270 88 251 202H104L107 153Q109 132 124 119Z" fill="url(#busGlass)" stroke="#81939a" stroke-width="5"/>
       <path d="M279 88H355V202H265Z" fill="url(#busGlass)" stroke="#81939a" stroke-width="5"/>
       <path d="M365 88H447V202H365Z M457 88H539V202H457Z M549 88H631V202H549Z M641 88H723V202H641Z M733 88H813V202H733Z M822 107H886Q902 123 909 158L913 202H822Z" fill="url(#busGlass)" stroke="#81939a" stroke-width="5"/>
-      <g stroke="#dbe4e0" stroke-width="3" opacity=".75"><path d="M293 96 293 191M390 96 390 191M482 96 482 191M574 96 574 191M666 96 666 191M758 96 758 191M846 114 846 191"/></g>
+      <g stroke="#c8d6d6" stroke-width="3" opacity=".78"><path d="M293 96 293 191M390 96 390 191M482 96 482 191M574 96 574 191M666 96 666 191M758 96 758 191M846 114 846 191"/><path d="M286 95H346M372 95H440M464 95H532M556 95H624M648 95H716M740 95H806" opacity=".23"/></g>
       <path d="M274 211H907" stroke="#aab8b2" stroke-width="3"/>
-      <path d="M108 218 254 218 265 257H100Z" fill="#f6f8f7" stroke="#cbd6d1" stroke-width="2"/>
+      <path d="M108 218 254 218 265 257H100Z" fill="#FCFEFD" stroke="#cbd6d1" stroke-width="2"/>
       <path d="M147 222h80" stroke="#153b7e" stroke-width="6" stroke-linecap="round"/>
       <path d="M250 258H323" stroke="#f1a04b" stroke-width="5"/>
-      <path d="M164 260H245V303H164Z" fill="#f5f7f5" stroke="#c8d2cd" stroke-width="1.5"/>
+      <path d="M348 211V258M438 211V258" stroke="#aebbb6" stroke-width="2"/>
+      <path d="M350 214H436V256H350Z" fill="none" stroke="#dce5e1" stroke-width="1.5"/>
+      <path d="M359 222h12M422 222h7" stroke="#74877f" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M108 238 126 231 139 240 133 252 109 253Z" fill="#f4f8f6" stroke="#84979a" stroke-width="2"/>
+      <path d="M909 238 925 230 931 247 923 258 909 256Z" fill="#d74631" stroke="#a52f27" stroke-width="2"/>
+      <path d="M164 260H245V303H164Z" fill="#FCFEFD" stroke="none"/>
       <image href="../icons/vmg-logo.jpg" x="445" y="211" width="170" height="50" preserveAspectRatio="xMidYMid meet" aria-label="Logo Viação Minas Gerais"/>
-      <text x="204" y="292" text-anchor="middle" font-family="Arial,sans-serif" font-size="${Math.min(prefixSize,30)}" font-weight="900" fill="#101e31" stroke="#fff" stroke-width=".7" paint-order="stroke">${prefix}</text>
-      <text x="130" y="290" font-family="Arial,sans-serif" font-size="12" font-weight="800" fill="#fff">COMIL</text>
-      <g><circle cx="295" cy="310" r="49" fill="#101619" stroke="#53616a" stroke-width="5"/><circle cx="295" cy="310" r="28" fill="#9ca9a8" stroke="#dce3e0" stroke-width="5"/><circle cx="295" cy="310" r="10" fill="#47565a"/><path d="M295 284v52M269 310h52M277 292l36 36M313 292l-36 36" stroke="#657477" stroke-width="5"/>
-      <circle cx="790" cy="310" r="49" fill="#101619" stroke="#53616a" stroke-width="5"/><circle cx="790" cy="310" r="28" fill="#9ca9a8" stroke="#dce3e0" stroke-width="5"/><circle cx="790" cy="310" r="10" fill="#47565a"/><path d="M790 284v52M764 310h52M772 292l36 36M808 292l-36 36" stroke="#657477" stroke-width="5"/></g>
+      <text x="204" y="292" text-anchor="middle" font-family="Arial,sans-serif" font-size="${prefixSize}" font-weight="900" fill="#101e31">${prefix}</text>
+      <g><circle cx="295" cy="310" r="49" fill="#101619" stroke="#53616a" stroke-width="5"/><circle cx="295" cy="310" r="29" fill="url(#wheelMetal)" stroke="#dce3e0" stroke-width="5"/><circle cx="295" cy="310" r="10" fill="#47565a"/><path d="M295 284v52M269 310h52M277 292l36 36M313 292l-36 36" stroke="#657477" stroke-width="5"/><circle cx="295" cy="310" r="4" fill="#e9efec"/>
+      <circle cx="790" cy="310" r="49" fill="#101619" stroke="#53616a" stroke-width="5"/><circle cx="790" cy="310" r="29" fill="url(#wheelMetal)" stroke="#dce3e0" stroke-width="5"/><circle cx="790" cy="310" r="10" fill="#47565a"/><path d="M790 284v52M764 310h52M772 292l36 36M808 292l-36 36" stroke="#657477" stroke-width="5"/><circle cx="790" cy="310" r="4" fill="#e9efec"/></g>
       <path d="M340 205V286M810 207V286" stroke="#aab7b1" stroke-width="2"/><rect x="405" y="290" width="35" height="18" rx="4" fill="#c9d2cd"/><rect x="650" y="290" width="35" height="18" rx="4" fill="#c9d2cd"/>
-      <text x="500" y="402" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="800" letter-spacing="2" fill="#71817a">LATERAL · PREFIXO IDENTIFICADO NA CARROCERIA</text>
+      ${renderBusDamageRegions(view,markers)}
       ${renderBusMarkers(markers)}
     </svg>`;
   }else if(view==="front"){
-    body=`<svg class="bus-svg bus-svg-front" viewBox="0 0 640 420" role="img" aria-label="Ônibus visto de frente, prefixo ${prefix}, placa ${plate}">
+    body=`<svg class="bus-svg bus-svg-front" viewBox="0 0 640 405" role="img" aria-label="Ônibus visto de frente, prefixo ${prefix}, placa ${plate}">
       ${defs}<ellipse cx="320" cy="381" rx="205" ry="17" fill="#243b34" opacity=".16" filter="url(#busShadow)"/>
       <path d="M116 353 105 150Q106 96 155 76Q206 55 320 55T485 76Q534 96 535 150L524 353Q520 372 496 378H144Q120 372 116 353Z" fill="url(#busBody)" stroke="#b9c7c2" stroke-width="4"/>
       <path d="M135 139Q146 91 190 85Q320 54 450 85Q494 91 505 139L492 253H148Z" fill="url(#busGlass)" stroke="#82939a" stroke-width="6"/>
@@ -317,25 +395,26 @@ function renderBusSvg(view,record,markers){
       <path d="M121 284Q142 267 174 278L192 315 129 322Z" fill="#dce9e8" stroke="#8fa09d" stroke-width="4"/><path d="M519 284Q498 267 466 278L448 315 511 322Z" fill="#dce9e8" stroke="#8fa09d" stroke-width="4"/>
       <path d="M138 291h42M460 291h42" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
       <path d="M190 326Q320 340 450 326" stroke="#061532" stroke-width="12" fill="none" stroke-linecap="round"/>
-      <rect x="260" y="339" width="120" height="27" rx="4" fill="#f7f8f6" stroke="#b9c5c0" stroke-width="2"/><text x="320" y="357" text-anchor="middle" font-family="Arial,sans-serif" font-size="${plate.length>10?10:13}" font-weight="900" letter-spacing="1" fill="#17332e">${plate}</text>
+      <rect x="260" y="339" width="120" height="27" rx="4" fill="#FCFEFD" stroke="#b9c5c0" stroke-width="2"/><text x="320" y="357" text-anchor="middle" font-family="Arial,sans-serif" font-size="${plate.length>10?10:13}" font-weight="900" letter-spacing="1" fill="#17332e">${plate}</text>
       <path d="M95 145 68 126Q58 120 55 131L55 188Q58 202 70 196L105 183Z M545 145 572 126Q582 120 585 131L585 188Q582 202 570 196L535 183Z" fill="#182a35" stroke="#8a9b9f" stroke-width="5"/>
+      <path d="M225 376Q320 386 415 376" stroke="#b6c4bf" stroke-width="3" fill="none"/>
       <text x="320" y="48" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="900" letter-spacing="3" fill="#65746e">VMG</text>
-      <text x="320" y="402" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="800" letter-spacing="2" fill="#71817a">FRENTE · PLACA DO VEÍCULO</text>
+      ${renderBusDamageRegions(view,markers)}
       ${renderBusMarkers(markers)}
     </svg>`;
   }else{
-    body=`<svg class="bus-svg bus-svg-rear" viewBox="0 0 640 420" role="img" aria-label="Ônibus visto por trás, prefixo ${prefix}, placa ${plate}">
+    body=`<svg class="bus-svg bus-svg-rear" viewBox="0 0 640 405" role="img" aria-label="Ônibus visto por trás, prefixo ${prefix}, placa ${plate}">
       ${defs}<ellipse cx="320" cy="381" rx="205" ry="17" fill="#243b34" opacity=".16" filter="url(#busShadow)"/>
       <path d="M120 350 112 122Q114 84 153 71H487Q526 84 528 122L520 350Q516 373 492 378H148Q124 373 120 350Z" fill="url(#busBody)" stroke="#b9c7c2" stroke-width="4"/>
       <rect x="151" y="91" width="338" height="137" rx="26" fill="url(#busGlass)" stroke="#81939a" stroke-width="6"/>
       <path d="M320 96V221" stroke="#98a8ad" stroke-width="4"/><path d="M164 211H476" stroke="#d4dfdc" stroke-width="2"/>
-      <text x="320" y="260" text-anchor="middle" font-family="Arial,sans-serif" font-size="43" font-weight="800" letter-spacing="3" fill="#8d9994">VMG</text>
-      <text x="320" y="277" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="800" letter-spacing="2" fill="#66746e">VIAÇÃO MINAS GERAIS</text>
-      <rect x="118" y="244" width="404" height="112" rx="12" fill="url(#busNavy)"/>
-      <rect x="132" y="256" width="29" height="70" rx="8" fill="#d94735" stroke="#f9d6ce" stroke-width="3"/><rect x="479" y="256" width="29" height="70" rx="8" fill="#d94735" stroke="#f9d6ce" stroke-width="3"/>
+      <path d="M118 244H522V356H118Z" fill="url(#busNavy)"/>
+      <path d="M132 256H161V327H132Z M479 256H508V327H479Z" fill="#d94735" stroke="#f9d6ce" stroke-width="3"/>
+      <path d="M138 265H155M485 265H502" stroke="#fff0e9" stroke-width="4" stroke-linecap="round"/>
       <path d="M180 296H460" stroke="#7d91a9" stroke-width="10" stroke-linecap="round"/>
-      <rect x="260" y="334" width="120" height="27" rx="4" fill="#f7f8f6" stroke="#b9c5c0" stroke-width="2"/><text x="320" y="352" text-anchor="middle" font-family="Arial,sans-serif" font-size="${plate.length>10?10:13}" font-weight="900" letter-spacing="1" fill="#17332e">${plate}</text>
-      <text x="320" y="402" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="800" letter-spacing="2" fill="#71817a">TRASEIRA · IDENTIFICAÇÃO DO VEÍCULO</text>
+      <rect x="260" y="334" width="120" height="27" rx="4" fill="#FCFEFD" stroke="#b9c5c0" stroke-width="2"/><text x="320" y="352" text-anchor="middle" font-family="Arial,sans-serif" font-size="${plate.length>10?10:13}" font-weight="900" letter-spacing="1" fill="#17332e">${plate}</text>
+      <path d="M143 375H497" stroke="#aebdb7" stroke-width="3" stroke-linecap="round"/>
+      ${renderBusDamageRegions(view,markers)}
       ${renderBusMarkers(markers)}
     </svg>`;
   }

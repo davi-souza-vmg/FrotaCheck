@@ -415,3 +415,11 @@ html,body{max-width:100%;overflow-x:clip}
   .bus-hotspot-pulse{animation:none}
   .bus-issue-chip{break-inside:avoid}
 }
+
+/* Ônibus SVG: destaque integrado à carroceria, em vez de apenas pontos soltos. */
+.bus-damage-area{fill:#e52b32;fill-opacity:.43;stroke:#c71927;stroke-width:2.2;stroke-linejoin:round;vector-effect:non-scaling-stroke;filter:drop-shadow(0 1px 2px rgba(150,18,24,.2));animation:busDamageIn .24s ease-out both;pointer-events:none}
+@keyframes busDamageIn{from{fill-opacity:0;opacity:.35}to{fill-opacity:.43;opacity:1}}
+.bus-svg{filter:drop-shadow(0 5px 5px rgba(22,49,42,.045))}
+.bus-illustration{background:linear-gradient(180deg,#fbfdfc 0%,#f0f5f2 100%)}
+.bus-hotspot-core{stroke-width:3.4}
+@media(prefers-reduced-motion:reduce){.bus-damage-area{animation:none}}
