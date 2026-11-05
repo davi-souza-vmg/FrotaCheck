@@ -1,4 +1,4 @@
-/* FrotaCheck — interface com rascunhos locais e sincronização via Google Apps Script. */
+/* FrotaCheck — checklist e consulta com sincronização via Google Apps Script. */
 const STORAGE_KEY = "frotacheck.records.v1";
 const SESSION_KEY = "frotacheck.session.v2";
 const API_URL = "https://script.google.com/macros/s/AKfycbzZG4ax6WY_8tDxZpjcz_cvRpEoNLMLSPpPX0EywDqAsj_dni5O0UKgNjTtcqsXTuyATQ/exec";
@@ -112,6 +112,15 @@ function compressImage(file){return new Promise((resolve,reject)=>{const reader=
 function saveRecord(status){const r=formData();r.status=status;r.updatedAt=new Date().toISOString();if(status==="complete")r.completedAt=new Date().toISOString();const i=records.findIndex(x=>x.id===r.id);if(i>=0)records[i]=r;else records.unshift(r);activeId=r.id;persist();renderHistory();$("saveState").textContent=status==="complete"?"Finalizado neste aparelho":"Formulário salvo";toast(navigator.onLine?"Salvo neste aparelho; sincronizando…":"Salvo neste aparelho. Será sincronizado quando houver conexão.");r.cloudSynced=false;const savedIndex=records.findIndex(x=>x.id===r.id);if(savedIndex>=0)records[savedIndex].cloudSynced=false;persist();if(navigator.onLine)syncRecord(r);return r;}
 function autoSaveDraft(){}
 function clearLocalDraft(){}
+function clearForm(){
+  activeId=null; photos=[];
+  const form=$("checklistForm");
+  if(form) form.reset();
+  fillForm(null);
+  if($("saveState")) $("saveState").textContent="";
+  if($("lastSaved")) $("lastSaved").textContent="";
+  toast("Formulário limpo. Nenhum rascunho foi salvo.");
+}
 
 function openDetail(id){const r=records.find(x=>x.id===id);if(!r)return;activeId=id;$("detailStatus").className="status-pill "+r.status;$("detailStatus").textContent=statusLabel(r);
   const groups=GROUPS.map((g,gi)=>({title:g.title,items:g.items.map((name,ii)=>({name,...(r.checks||{})[`g${gi}_${ii}`]}))}));
