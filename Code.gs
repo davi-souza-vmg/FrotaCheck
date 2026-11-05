@@ -111,7 +111,7 @@ function saveRecord_(user, record) {
     photoIds.push(file.getId());
   });
   const now = new Date().toISOString();
-  const values = [String(record.id), owner, String(record.status || "draft"), String(record.dateTime || ""), String(record.driver || ""), String(record.vehicle || ""), String(record.vehicleType || ""), String(record.odometer || ""), String(record.origin || ""), String(record.destination || ""), JSON.stringify(record.checks || {}), String(record.damageNotes || ""), String(record.generalNotes || ""), JSON.stringify(photoIds), String(record.updatedAt || now), String(record.completedAt || ""), String(record.formType || "Checklist")];
+  const values = [String(record.id), owner, String(record.status || "complete"), String(record.dateTime || ""), String(record.driver || ""), String(record.vehicle || ""), String(record.vehicleType || ""), String(record.odometer || ""), String(record.origin || ""), String(record.destination || ""), JSON.stringify(record.checks || {}), String(record.damageNotes || ""), String(record.generalNotes || ""), JSON.stringify(photoIds), String(record.updatedAt || now), String(record.completedAt || ""), String(record.formType || "Checklist")];
   if (rowNumber) sh.getRange(rowNumber, 1, 1, values.length).setValues([values]);
   else sh.appendRow(values);
   return { ok: true, id: record.id, owner: owner, updatedAt: now };
@@ -162,9 +162,19 @@ function listMetadata_(user) {
   if (sh.getLastRow() < 2) return [];
   const rows = sh.getRange(2, 1, sh.getLastRow() - 1, SHEETS.Checklists.length).getValues();
   return rows.filter(r => canUserViewOwner_(user, r[1])).map(r => {
-    let photoIds = [];
+    let checks = {}, photoIds = [];
+    try { checks = JSON.parse(r[10] || "{}"); } catch (_) {}
     try { photoIds = JSON.parse(r[13] || "[]"); } catch (_) {}
-    return { id:String(r[0]), owner:String(r[1]), status:String(r[2]), updatedAt:String(r[14] || ""), photoCount:photoIds.length };
+    // A lista da gerência recebe metadados e avaliações, mas não baixa as imagens em lote.
+    // As fotos são carregadas somente quando alguém abre um checklist específico.
+    return {
+      id:String(r[0]), owner:String(r[1]), status:String(r[2]), dateTime:String(r[3] || ""),
+      driver:String(r[4] || ""), vehicle:String(r[5] || ""), vehicleType:String(r[6] || ""),
+      odometer:String(r[7] || ""), origin:String(r[8] || ""), destination:String(r[9] || ""),
+      checks:checks, damageNotes:String(r[11] || ""), generalNotes:String(r[12] || ""),
+      photoCount:photoIds.length, updatedAt:String(r[14] || ""), completedAt:String(r[15] || ""),
+      formType:String(r[16] || "Checklist")
+    };
   }).sort((a,b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
 

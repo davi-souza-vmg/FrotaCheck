@@ -23,24 +23,25 @@
   <main class="shell">
     <section id="appView" hidden>
       <div class="welcome-row">
-        <div><span class="eyebrow">PAINEL DA EQUIPE</span><h1>Consulta de formulários</h1><p class="muted">Consulte os formulários enviados pelos conferentes.</p></div>
+        <div><span class="eyebrow">PAINEL DA EQUIPE</span><h1>Gerência de checklists</h1><p class="muted">Acompanhe os registros enviados pela equipe.</p></div>
         
       </div>
       <div class="stats-grid">
-        <article class="stat-card"><span>Tudo certo</span><strong id="statTotal">0</strong><small>Finalizados sem pendências</small></article>
-        <article class="stat-card"><span>Com pendências</span><strong id="statWithIssues">0</strong><small>Itens marcados como NÃO OK</small></article>
-        <article class="stat-card"><span>Total de checklists</span><strong id="statIssues">0</strong><small>Todos os registros recebidos</small></article>
+        <article class="stat-card"><span>Sem pendências</span><strong id="statTotal">0</strong></article>
+        <article class="stat-card"><span>Com pendências</span><strong id="statWithIssues">0</strong></article>
+        <article class="stat-card"><span>Total</span><strong id="statIssues">0</strong></article>
       </div>
       <div class="content-heading"><div><h2>Todos os formulários</h2><p class="muted">Formulários enviados à nuvem.</p></div>
         <div class="filter-wrap"><input id="historySearch" placeholder="Buscar veículo, destino..." aria-label="Buscar no histórico"><select id="historyFilter" aria-label="Filtrar histórico"><option value="all">Todos</option><option value="clean">Sem pendências</option><option value="issues">Com pendências</option></select></div>
       </div>
-      <div id="historyList" class="history-list"></div>
+      <div id="historyLoading" class="loading-state">Buscando os checklists mais recentes…</div>
+      <div id="historyList" class="history-list" hidden></div>
       <div id="emptyHistory" class="empty-state"><div class="empty-icon">▤</div><h3>Nenhum checklist por aqui</h3><p>Comece registrando a próxima saída do veículo.</p><button class="btn btn-primary" id="emptyNewBtn">Atualizar lista</button></div>
     </section>
 
     <section id="formView" hidden>
       <div class="form-top"><div class="save-state" id="saveState"></div></div>
-      <div class="form-heading"><div><span class="eyebrow">INSPEÇÃO DE SAÍDA</span><h1 id="formTitle">Novo checklist</h1><p class="muted">Preencha as informações e marque a condição de cada item.</p></div><div class="step-count" id="progressText">0% concluído</div></div>
+      <div class="form-heading"><div><span class="eyebrow">INSPEÇÃO DE SAÍDA</span><h1 id="formTitle">Novo checklist</h1><p class="muted">Avalie cada item e registre observações quando necessário.</p></div><div class="step-count" id="progressText">0% concluído</div></div>
       <div class="progress-track"><div id="progressBar"></div></div>
       <form id="checklistForm">
         <section class="panel form-section">
@@ -56,16 +57,18 @@
           </div>
         </section>
         <div id="checklistSections"></div>
-        <section class="panel form-section">
-          <div class="section-title"><span class="section-number">08</span><div><h2>Itens operacionais</h2><p>Conferência complementar do documento original</p></div></div>
-          <div id="operationalItems" class="item-list"></div>
+        <section class="check-group special-check-section operational-section">
+          <header class="check-section-head"><span class="section-number">08</span><div><h2>Itens operacionais</h2><p>Conferência complementar do veículo</p></div></header>
+          <div id="operationalItems" class="item-list operational-items-grid"></div>
         </section>
-        <section class="panel form-section">
-          <div class="section-title"><span class="section-number">09</span><div><h2>Avarias e observações</h2><p>Registre detalhes e adicione fotos de referência</p></div></div>
+        <section class="check-group special-check-section extra-notes-section">
+          <header class="check-section-head"><span class="section-number">09</span><div><h2>Avarias e observações</h2><p>Registre detalhes e adicione fotos de referência</p></div></header>
+          <div class="special-section-body">
           <label>Descrição de avarias<textarea id="damageNotes" rows="3" placeholder="Ex.: risco nos retrovisores, amassados, trincas..."></textarea></label>
           <div class="photo-head"><div><strong>Fotos das avarias</strong><p class="muted">Use a câmera do celular ou escolha uma imagem.</p></div><button id="addPhotosBtn" type="button" class="btn btn-secondary photo-button" aria-haspopup="dialog">＋ Adicionar fotos</button><input id="photoInputCamera" type="file" accept="image/*" capture="environment" hidden><input id="photoInput" type="file" accept="image/*" multiple hidden></div>
           <div id="photoGallery" class="photo-gallery"></div>
           <label>Observações gerais<textarea id="generalNotes" rows="3" placeholder="Informações adicionais sobre a saída..."></textarea></label>
+          </div>
         </section>
         <div class="form-actions"><button id="clearFormBtn" type="button" class="btn btn-secondary">Limpar formulário</button><button id="finishBtn" type="button" class="btn btn-primary">Enviar formulário <span>→</span></button></div>
         <p class="tiny-note">Ao enviar, o formulário será registrado na planilha para consulta da gerência.</p>

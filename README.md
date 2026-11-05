@@ -91,7 +91,7 @@ Envie `index.html`, `styles.css`, `app.js`, `manifest.webmanifest` e `sw.js` par
 
 Esta versão atualiza os registros da nuvem automaticamente a cada 5 segundos enquanto o painel de Conferência estiver visível e ao voltar para a aba/janela do FrotaCheck. Ao retornar a conexão, a lista é carregada novamente. O formulário de Checklist não é salvo nem sincronizado em segundo plano.
 
-A consulta periódica busca primeiro apenas metadados. Somente os checklists novos ou alterados têm seus detalhes e fotos carregados, reduzindo o tráfego e as leituras desnecessárias no Google Drive. Enquanto o formulário está aberto, a consulta automática de alterações pausa. Nenhum conteúdo digitado é enviado antes do clique em Enviar formulário.
+A consulta periódica busca primeiro os dados dos cards e as avaliações, sem baixar imagens. As fotos são carregadas somente quando alguém abre um checklist específico, reduzindo o tráfego e as leituras desnecessárias no Google Drive. Enquanto o formulário está aberto, a consulta automática de alterações pausa. Nenhum conteúdo digitado é enviado antes do clique em Enviar formulário.
 
 As fotos do formulário e da visualização do checklist podem ser clicadas para abrir uma galeria ampliada. O preview oferece zoom por botões ou roda do mouse, botão para ajustar à tela, arraste quando ampliado e fechamento pelo botão ou tecla Esc.
 
@@ -104,3 +104,13 @@ As fotos do formulário e da visualização do checklist podem ser clicadas para
 5. Teste o envio de um checklist, confirme que aparece na tela Conferência e atualize a página para verificar que ele é recuperado da nuvem. Depois, teste o fluxo também em um celular.
 
 Observação: a sincronização automática não é um canal push instantâneo; consulta o Apps Script a cada 5 segundos. A latência depende da conexão, do tempo de resposta do Apps Script e das cotas do Google.
+
+
+## Refinamento visual do checklist e da Gerência
+
+- O checklist usa seletores segmentados com três estados independentes: ✕ Não OK (vermelho), / Não se aplica (neutro) e ✓ OK (verde), com transição curta ao selecionar.
+- O campo de observação de cada item aparece somente quando a resposta é `/` ou `✓`. Ao marcar `✕`, a observação daquele item é limpa.
+- As perguntas foram reescritas para que uma resposta positiva indique uma condição adequada do veículo.
+- As seções agora seguem uma numeração contínua: 01 Identificação, 02 a 07 inspeções, 08 Itens operacionais e 09 Avarias e observações. Os títulos usam o mesmo padrão visual.
+- O layout mobile impede rolagem horizontal, mantém os três indicadores da Gerência alinhados na mesma fileira e simplifica os filtros.
+- Para a atualização rápida da Gerência, publique também o `Code.gs` atualizado. A ação `listMeta` passou a retornar os dados necessários aos cards sem baixar fotos em lote; as fotos continuam sendo obtidas ao abrir um registro. O frontend possui fallback para APIs antigas, mas esse fallback é mais lento.

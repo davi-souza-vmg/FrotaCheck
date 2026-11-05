@@ -4,17 +4,18 @@ let refreshInFlight = false;
 let realtimeTimer = null;
 let cloudLoading = false;
 const GROUPS = [
-  {title:"Externo (visual geral)",items:["Sem avarias visíveis na lataria","Retrovisores em boas condições","Vidros e para-brisa íntegros","Sem vazamento no chão","Portas funcionando"]},
-  {title:"Pneus",items:["Pneus calibrados e sem danos","Rodas firmes","Estepe em boas condições"]},
-  {title:"Luzes",items:["Farol alto/baixo","Setas e pisca-alerta","Luz de freio","Lanternas"]},
-  {title:"Segurança",items:["Freios funcionando","Freio de mão funcionando","Extintor válido","Cintos de segurança","Saídas de emergência"]},
-  {title:"Funcionamento",items:["Sem luz de alerta no painel","Buzina funcionando","Ar-condicionado/ventilação","Sem ruídos anormais"]},
-  {title:"Operacional",items:["Combustível suficiente","Documentação no veículo","Limpeza básica do veículo"]}
+  {title:"Externo · visual geral",items:["A lataria está em boas condições, sem avarias visíveis?","Os retrovisores estão em boas condições?","Os vidros e o para-brisa estão íntegros?","O veículo está sem vazamentos aparentes?","As portas estão funcionando corretamente?"]},
+  {title:"Pneus",items:["Os pneus estão calibrados e sem danos?","As rodas estão firmes?","O estepe está em boas condições?"]},
+  {title:"Luzes",items:["Os faróis alto e baixo estão funcionando?","As setas e o pisca-alerta estão funcionando?","As luzes de freio estão funcionando?","As lanternas estão funcionando?"]},
+  {title:"Segurança",items:["Os freios estão funcionando corretamente?","O freio de mão está funcionando?","O extintor está dentro da validade?","Os cintos de segurança estão funcionando?","As saídas de emergência estão desobstruídas?"]},
+  {title:"Funcionamento",items:["O painel está sem luzes de alerta acesas?","A buzina está funcionando?","O ar-condicionado e a ventilação estão funcionando?","O veículo está funcionando sem ruídos anormais?"]},
+  {title:"Operacional",items:["O veículo tem combustível suficiente?","A documentação obrigatória está no veículo?","O veículo está com a limpeza básica em dia?"]}
 ];
 const OPERATIONAL = [
-  "Porta de embarque possui chave?","Tranca da porta está funcionando?","Possui chave da tampa do tanque?","Tanque de combustível está cheio?","Condições dos pneus estão boas?","Tanque do ARLA está cheio?","Possui chave do tanque do ARLA?","Veículo possui estepe?","Veículo possui macaco?","Veículo possui chave de roda?","Veículo possui triângulo?","Tacógrafo está funcionando?","Tranca do bagageiro do estepe?","Filtro de combustível em dia?","Filtro de ar em bom estado?","Placa do veículo está legível?","Rastreadores presentes/funcionando?"
+  "A porta de embarque possui chave?","A trava da porta está funcionando?","Há uma chave para a tampa do tanque?","O tanque de combustível está cheio?","Os pneus estão em boas condições?","O tanque de ARLA está cheio?","Há uma chave para o tanque de ARLA?","O veículo possui estepe?","O veículo possui macaco?","O veículo possui chave de roda?","O veículo possui triângulo?","O tacógrafo está funcionando?","A trava do bagageiro do estepe está funcionando?","O filtro de combustível está em dia?","O filtro de ar está em boas condições?","A placa do veículo está legível?","Os rastreadores estão presentes e funcionando?"
 ];
 let records = [];
+let historyHasLoaded = false;
 let activeId = null;
 let photos = [];
 let currentUser = null;
@@ -39,11 +40,29 @@ function customConfirm(message,title="Confirmar ação",confirmLabel="Confirmar"
 function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),2600);}
 function setConnection(){const online=navigator.onLine;$("offlineBanner").hidden=online;$("connectionState").classList.toggle("offline",!online);$("connectionState").innerHTML=`<i></i>${online?"Online":"Offline"}`;}
 function statusLabel(r){return r.status==="complete"?"Finalizado":r.status==="pending"?"Pendente de envio":"Não enviado";}
-function makeChoices(name,value=""){return `<div class="item-options" role="group" aria-label="Avaliação">${[["bad","✕","Não OK"],["na","/","Não se aplica"],["ok","✓","OK"]].map(([v,glyph,label])=>`<label class="choice choice-${v} ${value===v?"is-selected":""}" title="${label}" aria-label="${label}"><input type="radio" name="${name}" value="${v}" ${value===v?"checked":""}><span>${glyph}</span></label>`).join("")}</div>`;}
+function makeChoices(name,value=""){
+  return `<div class="item-options" role="radiogroup" aria-label="Avaliação do item">${[["bad","✕","Não OK"],["na","/","Não se aplica"],["ok","✓","OK"]].map(([v,glyph,label])=>`<label class="choice choice-${v} ${value===v?"is-selected":""}" title="${label}" aria-label="${label}"><input type="radio" name="${name}" value="${v}" ${value===v?"checked":""}><span aria-hidden="true">${glyph}</span></label>`).join("")}</div>`;
+}
+function sectionHeader(number,title,subtitle=""){
+  return `<header class="check-section-head"><span class="section-number">${String(number).padStart(2,"0")}</span><div><h2>${title}</h2>${subtitle?`<p>${subtitle}</p>`:""}</div></header>`;
+}
+function renderCheckItem(item,key,valueData={}){
+  const selected=valueData.value||"";
+  const noteVisible=selected==="na"||selected==="ok";
+  return `<div class="check-item"><div class="item-name">${escapeHtml(item)}</div>${makeChoices(key,selected)}<div class="item-note" ${noteVisible?"":"hidden"}><input data-note="${key}" value="${escapeHtml(valueData.note||"")}" placeholder="Observação (opcional)" aria-label="Observação para ${escapeHtml(item)}"></div></div>`;
+}
 function renderCheckSections(data={}){
-  $("checklistSections").innerHTML=`<div class="check-groups">${GROUPS.map((g,gi)=>`<section class="check-group"><div class="group-head">${String(gi+1).padStart(2,"0")} · ${g.title}</div><div class="item-list">${g.items.map((item,ii)=>{const key=`g${gi}_${ii}`,v=data.checks?.[key]||{};return `<div class="check-item"><div class="item-name">${item}</div>${makeChoices(key,v.value)}<div class="item-note"><input data-note="${key}" value="${escapeHtml(v.note||"")}" placeholder="Observação (opcional)"></div></div>`}).join("")}</div></section>`).join("")}</div>`;
-  $("operationalItems").innerHTML=OPERATIONAL.map((item,i)=>{const key=`op${i}`,v=data.checks?.[key]||{};return `<div class="check-item"><div class="item-name">${item}</div>${makeChoices(key,v.value)}<div class="item-note"><input data-note="${key}" value="${escapeHtml(v.note||"")}" placeholder="${i===4?"Ex.: serão trocados": "Observação (opcional)"}"></div></div>`}).join("");
-  document.querySelectorAll('#checklistForm input[type="radio"]').forEach(el=>el.addEventListener("change",()=>{updateProgress();document.querySelectorAll(`input[name="${el.name}"]`).forEach(r=>r.closest(".choice")?.classList.toggle("is-selected",r.checked));}));
+  $("checklistSections").innerHTML=`<div class="check-groups">${GROUPS.map((g,gi)=>`<section class="check-group">${sectionHeader(gi+2,g.title)}<div class="item-list">${g.items.map((item,ii)=>{const key=`g${gi}_${ii}`,v=data.checks?.[key]||{};return renderCheckItem(item,key,v);}).join("")}</div></section>`).join("")}</div>`;
+  $("operationalItems").innerHTML=OPERATIONAL.map((item,i)=>{const key=`op${i}`,v=data.checks?.[key]||{};return renderCheckItem(item,key,v);}).join("");
+  document.querySelectorAll('#checklistForm input[type="radio"]').forEach(el=>el.addEventListener("change",()=>{
+    const group=document.querySelectorAll(`input[name="${el.name}"]`);
+    group.forEach(r=>r.closest(".choice")?.classList.toggle("is-selected",r.checked));
+    const item=el.closest(".check-item"),note=item?.querySelector(".item-note"),noteInput=note?.querySelector("input");
+    const showNote=el.value==="na"||el.value==="ok";
+    if(note)note.hidden=!showNote;
+    if(el.value==="bad"&&noteInput)noteInput.value="";
+    updateProgress();
+  }));
 }
 function collectChecks(){const checks={};document.querySelectorAll('#checklistForm input[type="radio"]:checked').forEach(el=>{checks[el.name]??={};checks[el.name].value=el.value;});document.querySelectorAll('#checklistForm [data-note]').forEach(el=>{const key=el.dataset.note;checks[key]??={};checks[key].note=el.value;});return checks;}
 function completedCount(){const checked=document.querySelectorAll('#checklistForm input[type="radio"]:checked').length;const total=document.querySelectorAll('#checklistForm input[type="radio"][value="ok"]').length;return {checked,total};}
@@ -122,7 +141,7 @@ async function clearForm(){
 }
 function issuesFor(record){return Object.values(record.checks||{}).filter(item=>item?.value==="bad").length;}
 function renderHistory(){
-  const search=$("historySearch"),filterControl=$("historyFilter"),listEl=$("historyList"),emptyEl=$("emptyHistory");
+  const search=$("historySearch"),filterControl=$("historyFilter"),listEl=$("historyList"),emptyEl=$("emptyHistory"),loadingEl=$("historyLoading");
   if(!listEl||!emptyEl)return;
   const query=(search?.value||"").trim().toLowerCase();
   const filter=filterControl?.value||"all";
@@ -133,63 +152,98 @@ function renderHistory(){
   if($("statWithIssues"))$("statWithIssues").textContent=withIssues.length;
   if($("statIssues"))$("statIssues").textContent=all.length;
   const statCards=document.querySelectorAll(".stats-grid .stat-card");
-  if(statCards.length===3){
-    statCards[0].querySelector("span").textContent="Sem pendências";
-    statCards[0].querySelector("small").textContent="Finalizados sem itens NÃO OK · clique para filtrar";
-    statCards[1].querySelector("span").textContent="Com pendências";
-    statCards[1].querySelector("small").textContent="Itens marcados como NÃO OK · clique para filtrar";
-    statCards[2].querySelector("span").textContent="Total de checklists";
-    statCards[2].querySelector("small").textContent="Registros enviados à nuvem";
-  }
+  const labels=["Sem pendências","Com pendências","Total"];
+  statCards.forEach((card,index)=>{
+    const label=card.querySelector("span");
+    const description=card.querySelector("small");
+    if(label)label.textContent=labels[index]||"";
+    if(description)description.remove();
+    card.classList.toggle("is-active",(index===0&&filter==="clean")||(index===1&&filter==="issues")||(index===2&&filter==="all"));
+  });
   const visible=all.filter(r=>{
     const matchesFilter=filter==="all"||(filter==="clean"&&issuesFor(r)===0)||(filter==="issues"&&issuesFor(r)>0);
     const haystack=[r.formType,r.vehicle,r.destination,r.origin,r.driver].join(" ").toLowerCase();
     return matchesFilter&&haystack.includes(query);
   });
-  listEl.innerHTML=visible.map(r=>`<article class="history-card"><div class="vehicle-icon">▣</div><div class="history-main"><strong>${escapeHtml(r.formType||"Checklist")} · ${escapeHtml(r.vehicle||"Veículo sem prefixo")} · ${escapeHtml(r.destination||"Destino não informado")}</strong><p>${escapeHtml(r.driver||"Conferente")} · ${escapeHtml(r.origin||"Origem não informada")} → ${escapeHtml(r.destination||"")}</p></div><div class="history-meta"><span class="status-pill ${escapeHtml(r.status||"complete")}">${issuesFor(r)>0?"Com pendências":"Finalizado"}</span><small>${displayDateTime(r.dateTime)} · ${Number.isFinite(r.photoCount)?r.photoCount:(r.photos||[]).length} foto(s)</small></div><div class="card-actions"><button class="mini-btn" data-open="${escapeHtml(r.id)}" type="button">Abrir</button></div></article>`).join("");
-  emptyEl.hidden=visible.length>0;
-  listEl.hidden=visible.length===0;
-  if(search||filterControl){
-    document.querySelectorAll("[data-open]").forEach(button=>button.onclick=()=>openDetail(button.dataset.open));
-  }
+  listEl.innerHTML=visible.map(r=>`<article class="history-card"><div class="vehicle-icon" aria-hidden="true">▣</div><div class="history-main"><strong>${escapeHtml(r.formType||"Checklist")} · ${escapeHtml(r.vehicle||"Veículo sem prefixo")} · ${escapeHtml(r.destination||"Destino não informado")}</strong><p>${escapeHtml(r.driver||"Conferente")} · ${escapeHtml(r.origin||"Origem não informada")} → ${escapeHtml(r.destination||"")}</p></div><div class="history-meta"><span class="status-pill ${escapeHtml(r.status||"complete")}">${issuesFor(r)>0?"Com pendências":"Finalizado"}</span><small>${displayDateTime(r.dateTime)} · ${Number.isFinite(r.photoCount)?r.photoCount:(r.photos||[]).length} foto(s)</small></div><div class="card-actions"><button class="mini-btn" data-open="${escapeHtml(r.id)}" type="button">Ver detalhes <span aria-hidden="true">→</span></button></div></article>`).join("");
+  const hasVisible=visible.length>0;
+  listEl.hidden=!hasVisible;
+  if(loadingEl)loadingEl.hidden=historyHasLoaded;
+  emptyEl.hidden=hasVisible||!historyHasLoaded;
+  document.querySelectorAll("[data-open]").forEach(button=>button.onclick=()=>openDetail(button.dataset.open));
 }
 
-function openDetail(id){const r=records.find(x=>x.id===id);if(!r)return;activeId=id;$("detailStatus").className="status-pill "+r.status;$("detailStatus").textContent=statusLabel(r);
+async function openDetail(id){
+  const summary=records.find(x=>String(x.id)===String(id));
+  if(!summary)return;
+  activeId=id;
+  showView("detailView");
+  $("detailStatus").className="status-pill";
+  $("detailStatus").textContent="Carregando";
+  $("detailContent").innerHTML='<div class="loading-state">Carregando detalhes do checklist…</div>';
+  try{
+    const response=await apiRequest({action:"get",id});
+    if(!response.record)throw new Error("O checklist não foi encontrado na nuvem.");
+    renderDetail(response.record);
+  }catch(error){
+    console.error("Falha ao abrir checklist:",error);
+    toast("Não foi possível abrir o checklist: "+error.message);
+    showView("appView");
+  }
+}
+function renderDetail(r){
+  activeId=r.id;
+  $("detailStatus").className="status-pill "+(r.status||"complete");
+  $("detailStatus").textContent=statusLabel(r);
   const groups=GROUPS.map((g,gi)=>({title:g.title,items:g.items.map((name,ii)=>({name,...(r.checks||{})[`g${gi}_${ii}`]}))}));
   groups.push({title:"Itens operacionais",items:OPERATIONAL.map((name,i)=>({name,...(r.checks||{})[`op${i}`]}))});
-  $("detailContent").innerHTML=`<div class="detail-hero"><span class="eyebrow" style="color:#a9d6c5">CHECKLIST DE SAÍDA</span><h1>${escapeHtml(r.vehicle||"Veículo")} · ${escapeHtml(r.destination||"Destino")}</h1><p>${escapeHtml(r.driver||"")} · ${r.dateTime?displayDateTime(r.dateTime):"Data não informada"}</p><button id="downloadPdfBtn" class="pdf-button no-print" type="button" aria-label="Baixar PDF" title="Baixar PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3"/></svg></button></div><div class="detail-grid">${[["Tipo de veículo",r.vehicleType],["KM inicial",r.odometer],["Origem",r.origin],["Destino",r.destination],["Conferente",r.driver],["Atualizado",r.updatedAt?new Date(r.updatedAt).toLocaleString("pt-BR"):"—"]].map(([k,v])=>`<div class="detail-cell"><small>${k}</small><strong>${escapeHtml(v||"—")}</strong></div>`).join("")}</div>${groups.map(g=>`<section class="detail-group"><h3>${g.title}</h3>${g.items.map(it=>`<div class="detail-row"><span>${escapeHtml(it.name)}</span><span style="color:${it.value==="bad"?"#a83232":it.value==="ok"?"#237047":"#879690"}">${it.value==="ok"?"OK":it.value==="bad"?"NÃO OK":it.value==="na"?"N/A":"Não avaliado"}${it.note?" · "+escapeHtml(it.note):""}</span></div>`).join("")}</section>`).join("")}<section class="detail-group"><h3>Avarias e observações</h3><div class="detail-row"><span>Descrição</span><span>${escapeHtml(r.damageNotes||"Nenhuma informada")}</span></div><div class="detail-row"><span>Observações</span><span>${escapeHtml(r.generalNotes||"Nenhuma")}</span></div>${r.photos?.length?`<div class="detail-photos">${r.photos.map((p,i)=>`<img src="${p.data}" alt="${escapeHtml(p.name||"Foto de avaria "+(i+1))}" data-preview-photo tabindex="0" role="button" aria-label="Ampliar foto ${i+1}">`).join("")}</div>`:""}</section>`;
+  $("detailContent").innerHTML=`<div class="detail-hero"><span class="eyebrow" style="color:#a9d6c5">CHECKLIST DE SAÍDA</span><h1>${escapeHtml(r.vehicle||"Veículo")} · ${escapeHtml(r.destination||"Destino")}</h1><p>${escapeHtml(r.driver||"")} · ${r.dateTime?displayDateTime(r.dateTime):"Data não informada"}</p><button id="downloadPdfBtn" class="pdf-button no-print" type="button" aria-label="Baixar PDF" title="Baixar PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3"/></svg></button></div><div class="detail-grid">${[["Tipo de veículo",r.vehicleType],["KM inicial",r.odometer],["Origem",r.origin],["Destino",r.destination],["Conferente",r.driver],["Atualizado",r.updatedAt?new Date(r.updatedAt).toLocaleString("pt-BR"):"—"]].map(([k,v])=>`<div class="detail-cell"><small>${k}</small><strong>${escapeHtml(v||"—")}</strong></div>`).join("")}</div>${groups.map(g=>`<section class="detail-group"><h3>${escapeHtml(g.title)}</h3>${g.items.map(it=>`<div class="detail-row"><span>${escapeHtml(it.name)}</span><span style="color:${it.value==="bad"?"#a83232":it.value==="ok"?"#237047":"#879690"}">${it.value==="ok"?"OK":it.value==="bad"?"NÃO OK":it.value==="na"?"N/A":"Não avaliado"}${it.note?" · "+escapeHtml(it.note):""}</span></div>`).join("")}</section>`).join("")}<section class="detail-group"><h3>Avarias e observações</h3><div class="detail-row"><span>Descrição</span><span>${escapeHtml(r.damageNotes||"Nenhuma informada")}</span></div><div class="detail-row"><span>Observações</span><span>${escapeHtml(r.generalNotes||"Nenhuma")}</span></div>${r.photos?.length?`<div class="detail-photos">${r.photos.map((p,i)=>`<img src="${p.data}" alt="${escapeHtml(p.name||"Foto de avaria "+(i+1))}" data-preview-photo tabindex="0" role="button" aria-label="Ampliar foto ${i+1}">`).join("")}</div>`:""}</section>`;
   bindPhotoPreviews($("detailContent"));
-  const pdfBtn=$("downloadPdfBtn"); if(pdfBtn) pdfBtn.onclick=()=>{document.body.classList.add("printing-report");window.print();setTimeout(()=>document.body.classList.remove("printing-report"),1500);};
-  showView("detailView");
+  const pdfBtn=$("downloadPdfBtn");
+  if(pdfBtn)pdfBtn.onclick=()=>{document.body.classList.add("printing-report");window.print();setTimeout(()=>document.body.classList.remove("printing-report"),1500);};
 }
+
 async function apiRequest(payload){
-  const response = await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload),redirect:"follow"});
+  const response = await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload),redirect:"follow",cache:"no-store"});
   if(!response.ok) throw new Error("Não foi possível comunicar com o Apps Script (HTTP "+response.status+").");
   const data = await response.json();
   if(data && data.ok===false) throw new Error(data.error||"A solicitação não foi concluída.");
   return data;
 }
+async function fetchManagerRecords(){
+  let response=await apiRequest({action:"listMeta"});
+  const incoming=Array.isArray(response.records)?response.records:[];
+  // Compatibilidade com Apps Script ainda não atualizado: o endpoint antigo não traz os campos dos cards.
+  if(incoming.length&& !Object.prototype.hasOwnProperty.call(incoming[0],"vehicle")){
+    console.warn("A API ainda usa metadados antigos. Atualize o Code.gs para acelerar a Gerência.");
+    response=await apiRequest({action:"list"});
+  }
+  return Array.isArray(response.records)?response.records:[];
+}
 function mergeRecords(incoming){
-  records=(Array.isArray(incoming)?incoming:[]).map(record=>({...record,photoCount:Number.isFinite(record.photoCount)?record.photoCount:(record.photos||[]).length}));
+  records=(Array.isArray(incoming)?incoming:[]).map(record=>({...record,photoCount:Number.isFinite(Number(record.photoCount))?Number(record.photoCount):(record.photos||[]).length,photos:[]}));
   records.sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
   if(!$("appView").hidden)renderHistory();
 }
-async function loadCloudRecords(){
+async function loadCloudRecords({notify=false}={}){
   if(cloudLoading)return;
-  if(!navigator.onLine){renderHistory();toast("Sem conexão. A consulta depende dos registros na nuvem.");return;}
+  if(!navigator.onLine){historyHasLoaded=true;renderHistory();toast("Sem conexão. A consulta depende dos registros na nuvem.");return;}
   cloudLoading=true;
   const refreshButton=$("refreshListBtn");
   if(refreshButton){refreshButton.disabled=true;refreshButton.textContent="Atualizando…";}
   try{
-    const data=await apiRequest({action:"list"});
-    mergeRecords(data.records||[]);
-    if(!$("appView").hidden)toast("Lista atualizada com os registros da nuvem.");
+    const incoming=await fetchManagerRecords();
+    mergeRecords(incoming);
+    historyHasLoaded=true;
+    if(notify&&!$("appView").hidden)toast("Lista atualizada com os registros da nuvem.");
   }catch(err){
+    historyHasLoaded=true;
     console.error("Falha ao carregar checklists da nuvem:",err);
     toast("Não foi possível carregar os checklists: "+err.message);
   }finally{
     cloudLoading=false;
     if(refreshButton){refreshButton.disabled=false;refreshButton.textContent="Atualizar lista";}
+    renderHistory();
   }
 }
 async function refreshCloudChanges(force=false){
@@ -197,30 +251,24 @@ async function refreshCloudChanges(force=false){
   if($("formView").hidden===false)return;
   refreshInFlight=true;
   try{
-    const data=await apiRequest({action:"listMeta"});
-    const meta=Array.isArray(data.records)?data.records:[];
+    const meta=await fetchManagerRecords();
+    const oldById=new Map(records.map(item=>[String(item.id),item]));
     const metaById=new Map(meta.map(item=>[String(item.id),item]));
-    const localById=new Map(records.map(item=>[String(item.id),item]));
-    let changed=false;
-    const filtered=records.filter(record=>metaById.has(String(record.id)));
-    if(filtered.length!==records.length){records=filtered;changed=true;}
-    if(!$("detailView").hidden&&!metaById.has(String(activeId))){
-      showView("appView");
-      toast("Este checklist não está mais disponível.");
-    }
-    for(const metaRecord of meta){
-      const id=String(metaRecord.id),local=localById.get(id);
-      const differs=!local||String(local.updatedAt||"")!==String(metaRecord.updatedAt||"")||Number(local.photoCount??(local.photos||[]).length)!==Number(metaRecord.photoCount||0)||String(local.status||"")!==String(metaRecord.status||"");
-      if(!differs)continue;
-      const full=await apiRequest({action:"get",id});
-      if(full.record){
-        full.record.photoCount=Number.isFinite(full.record.photoCount)?full.record.photoCount:(full.record.photos||[]).length;
-        const index=records.findIndex(record=>String(record.id)===id);
-        if(index>=0)records[index]=full.record;else records.push(full.record);
-        changed=true;
+    const activeStillExists=activeId&&metaById.has(String(activeId));
+    const changed=meta.length!==records.length||meta.some(item=>{
+      const old=oldById.get(String(item.id));
+      return !old||String(old.updatedAt||"")!==String(item.updatedAt||"")||Number(old.photoCount||0)!==Number(item.photoCount||0)||String(old.status||"")!==String(item.status||"");
+    });
+    records=meta.map(item=>({...item,photoCount:Number(item.photoCount)||0,photos:[]})).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
+    if(!$("detailView").hidden&&!activeStillExists){showView("appView");toast("Este checklist não está mais disponível.");}
+    else if(!$("detailView").hidden&&activeStillExists){
+      const before=oldById.get(String(activeId)),after=metaById.get(String(activeId));
+      if(!before||String(before.updatedAt||"")!==String(after.updatedAt||"")){
+        const full=await apiRequest({action:"get",id:activeId});
+        if(full.record)renderDetail(full.record);
       }
     }
-    records.sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
+    historyHasLoaded=true;
     if(changed||force){if(!$("appView").hidden)renderHistory();if(changed&&!$("appView").hidden)toast("Lista atualizada com as alterações da equipe.");}
   }catch(err){console.warn("Atualização da lista:",err);}
   finally{refreshInFlight=false;}
@@ -253,7 +301,7 @@ $("photoInput").addEventListener("change",e=>{addPhotos(e.target.files);e.target
   camInput.addEventListener("change",e=>{addPhotos(e.target.files);e.target.value="";});
 })();
 if($("clearFormBtn")) $("clearFormBtn").onclick=clearForm;
-if($("refreshListBtn")) $("refreshListBtn").onclick=()=>loadCloudRecords();
+if($("refreshListBtn")) $("refreshListBtn").onclick=()=>loadCloudRecords({notify:true});
 const statCards=document.querySelectorAll(".stats-grid .stat-card"); if(statCards[0])statCards[0].onclick=()=>{$("historyFilter").value="clean";renderHistory();};if(statCards[1])statCards[1].onclick=()=>{$("historyFilter").value="issues";renderHistory();};if(statCards[2])statCards[2].onclick=()=>{$("historyFilter").value="all";renderHistory();};
 if($("historySearch"))$("historySearch").addEventListener("input",renderHistory);if($("historyFilter"))$("historyFilter").addEventListener("change",renderHistory);
 $("checklistForm").addEventListener("change",updateProgress);
@@ -262,7 +310,7 @@ window.addEventListener("online",async()=>{setConnection();await loadCloudRecord
 window.addEventListener("offline",setConnection);
 window.addEventListener("focus",()=>{refreshCloudChanges(true);});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshCloudChanges(true);});
-if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
+if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("../sw.js").catch(()=>{});
 clearLegacyLocalData();setConnection();if(!isEntryRoute)startRealtimeSync();
 currentUser={username:"público",name:"Conferente",role:"admin",roleLabel:"Consulta pública"};
 if(isEntryRoute){
@@ -274,6 +322,7 @@ if(isEntryRoute){
 }else{
   showView("appView");
   records=[];
+  historyHasLoaded=false;
   renderHistory();
   loadCloudRecords();
 }

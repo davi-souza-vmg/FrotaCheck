@@ -206,3 +206,127 @@ body.photo-source-open{overflow:hidden}
  .content-heading{align-items:stretch;flex-direction:column}
  .filter-wrap{display:grid;grid-template-columns:1fr}
 }
+
+/* ===== FrotaCheck | acabamento do checklist e da gerência ===== */
+html,body{max-width:100%;overflow-x:clip}
+.shell{width:100%;min-width:0}
+#checklistForm,.form-section,.check-groups,.check-group,.check-item,.special-section-body{min-width:0;max-width:100%}
+.form-heading{align-items:flex-start;flex-wrap:wrap}
+.form-heading>div:first-child{min-width:0;flex:1 1 240px}
+.form-heading h1{white-space:normal;overflow-wrap:anywhere}
+.check-section-head{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#f8fbf9;border-bottom:1px solid var(--line)}
+.check-section-head .section-number{flex:0 0 36px;width:36px;height:36px;margin:0;border-radius:11px;background:#e4f2ec;color:#176b55;font-size:12px}
+.check-section-head h2{margin:0;color:#17332e;font-size:14px;line-height:1.3;letter-spacing:-.2px}
+.check-section-head p{margin:3px 0 0;color:#71827b;font-size:11px;line-height:1.4}
+.check-group{min-width:0}
+.check-item{min-width:0}
+.check-item .item-name{overflow-wrap:anywhere}
+.item-options{display:inline-flex;align-items:center;justify-content:center;gap:3px;padding:4px;background:#f1f4f5;border:1px solid #e1e7e9;border-radius:14px;flex:0 0 auto;box-shadow:inset 0 1px 2px rgba(20,45,40,.035)}
+.item-options .choice{position:relative;display:grid;place-items:center;width:40px;height:38px;min-width:40px;margin:0;padding:0;border:1px solid transparent;border-radius:10px;background:transparent;color:#7a898f;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease}
+.item-options .choice input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;z-index:2}
+.item-options .choice span{display:grid;place-items:center;width:100%;height:100%;min-height:0;padding:0;border:1px solid transparent;border-radius:9px;background:transparent;color:inherit;font-size:19px;line-height:1;font-weight:650;transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease;pointer-events:none}
+.item-options .choice-bad.is-selected span,.item-options .choice-bad input:checked+span{background:#fee9e8;border-color:#f3b8b5;color:#c83c37;box-shadow:0 2px 5px rgba(200,60,55,.10)}
+.item-options .choice-na.is-selected span,.item-options .choice-na input:checked+span{background:#e9edf0;border-color:#d2dbe0;color:#53616b;box-shadow:0 2px 5px rgba(83,97,107,.08)}
+.item-options .choice-ok.is-selected span,.item-options .choice-ok input:checked+span{background:#def4e9;border-color:#9cd4bc;color:#17734e;box-shadow:0 2px 5px rgba(23,115,78,.10)}
+.item-options .choice:active{transform:scale(.94)}
+.item-options .choice:has(input:focus-visible){outline:3px solid #91bdae;outline-offset:2px}
+.item-options .choice.is-selected span{animation:choicePop .2s cubic-bezier(.2,.8,.2,1)}
+@keyframes choicePop{0%{transform:scale(.82)}65%{transform:scale(1.06)}100%{transform:scale(1)}}
+.check-item .item-note[hidden]{display:none!important}
+.check-item .item-note{width:100%;min-width:0;grid-column:1/-1;margin-top:0;animation:noteReveal .18s ease both}
+.check-item .item-note input{width:100%;min-width:0;min-height:43px;padding:10px 12px;border:1px solid #dce6e1;border-radius:11px;background:#fbfdfc;font-size:14px;box-sizing:border-box}
+@keyframes noteReveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.special-check-section{width:100%;margin-top:28px;border-radius:17px;overflow:hidden;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow)}
+.special-check-section .check-section-head{padding:16px 20px}
+.special-check-section .check-section-head .section-number{width:38px;height:38px;flex-basis:38px}
+.special-check-section .check-section-head h2{font-size:16px}
+.special-check-section .check-section-head p{font-size:11px}
+.operational-items-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:0}
+.operational-items-grid .check-item{padding:14px 17px}
+.operational-items-grid .check-item:nth-child(odd){border-right:1px solid #edf2ef}
+.special-section-body{padding:18px 20px 22px}
+.special-section-body>label{display:flex;flex-direction:column;gap:8px;margin:10px 0 18px;color:#36534c;font-size:13px;font-weight:700}
+.special-section-body textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box;border:1px solid #dce6e1;border-radius:12px;background:#fbfcfb;padding:12px 13px;font:inherit;font-size:14px;line-height:1.5;resize:vertical}
+.special-section-body textarea:focus{outline:none;border-color:#60a991;box-shadow:0 0 0 3px #e3f2ec}
+.loading-state{padding:18px 16px;border:1px solid #e1e9e4;border-radius:14px;background:#fff;color:#60756d;font-size:13px;text-align:center}
+.history-list[hidden],.loading-state[hidden]{display:none!important}
+.stats-grid .stat-card{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;min-width:0;min-height:116px;transition:background .18s,border-color .18s,box-shadow .18s,transform .18s}
+.stats-grid .stat-card span{font-size:12px;font-weight:700;color:#657871;line-height:1.3;min-height:0}
+.stats-grid .stat-card strong{font-size:30px;line-height:1.1;margin:9px 0 0;font-variant-numeric:tabular-nums}
+.stats-grid .stat-card.is-active{border-color:#9ecbb8;background:#f9fdfb;box-shadow:0 5px 16px rgba(23,107,85,.07)}
+.stats-grid .stat-card:focus-visible{outline:3px solid #91bdae;outline-offset:2px}
+.content-heading{align-items:flex-end;flex-wrap:wrap}
+.filter-wrap{min-width:0;max-width:100%;gap:9px}
+.filter-wrap input,.filter-wrap select{min-width:0;min-height:45px;border-radius:12px;background:#fff;font-size:13px}
+.history-card{min-width:0;transition:border-color .18s,box-shadow .18s,transform .18s}
+.history-card:hover{border-color:#c5d9d0;box-shadow:0 7px 22px rgba(18,59,53,.06)}
+.history-main strong,.history-main p{overflow-wrap:anywhere}
+.mini-btn{min-height:40px;padding:9px 13px;border-radius:10px;transition:background .16s,border-color .16s,transform .16s}
+.mini-btn:hover{background:#f2f8f5;border-color:#b8d5c8}
+.detail-row{min-width:0}
+.detail-row span{min-width:0;overflow-wrap:anywhere}
+@media(max-width:760px){
+  html,body{width:100%;overflow-x:clip}
+  .shell{width:100%;max-width:100%;padding:18px 12px calc(32px + env(safe-area-inset-bottom))}
+  .form-heading{display:flex;align-items:flex-start;gap:8px;margin-bottom:15px}
+  .form-heading>div:first-child{flex:1 1 190px}
+  .form-heading h1{font-size:clamp(21px,6vw,27px);white-space:normal;line-height:1.16;letter-spacing:-.5px}
+  .form-heading .muted{font-size:12px;max-width:38ch}
+  .step-count{margin-top:6px;padding:7px 9px;border-radius:10px;background:#edf6f1;font-size:10px}
+  .check-groups{grid-template-columns:minmax(0,1fr);gap:12px}
+  .check-group{width:100%;margin:0}
+  .check-section-head{padding:12px 13px;gap:10px}
+  .check-section-head .section-number{width:33px;height:33px;flex-basis:33px}
+  .check-section-head h2{font-size:13px}
+  .check-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:9px;padding:12px 10px}
+  .check-item .item-name{min-width:0;font-size:13px;line-height:1.42}
+  .item-options{gap:2px;padding:3px;border-radius:12px}
+  .item-options .choice{width:36px;height:36px;min-width:36px;border-radius:9px}
+  .item-options .choice span{font-size:18px}
+  .check-item .item-note{grid-column:1/-1}
+  .special-check-section{margin-top:22px}
+  .special-check-section .check-section-head{padding:13px 14px}
+  .operational-items-grid{grid-template-columns:minmax(0,1fr)}
+  .operational-items-grid .check-item:nth-child(odd){border-right:0}
+  .operational-items-grid .check-item{padding:12px 10px}
+  .special-section-body{padding:14px 12px 18px}
+  .special-section-body>label{font-size:12px}
+  .photo-head{display:flex;align-items:flex-start;gap:10px;flex-direction:column}
+  .photo-head .btn{width:100%;min-height:44px}
+  .form-actions{gap:8px;flex-wrap:wrap}
+  .form-actions .btn{min-width:0;flex:1 1 130px;min-height:46px;font-size:12px}
+  .stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:16px 0 24px}
+  .stats-grid .stat-card{min-width:0;min-height:83px;height:83px;padding:10px 5px;align-items:center;text-align:center;border-radius:13px}
+  .stats-grid .stat-card span{font-size:clamp(8px,2.5vw,10px);font-weight:750;line-height:1.2;overflow-wrap:anywhere}
+  .stats-grid .stat-card strong{font-size:clamp(20px,6vw,25px);margin:7px 0 0}
+  .content-heading{display:flex;flex-direction:column;align-items:stretch;gap:12px;margin-bottom:14px}
+  .content-heading h2{font-size:19px}
+  .content-heading p{font-size:11px}
+  .filter-wrap{display:grid;grid-template-columns:minmax(0,1fr);width:100%;max-width:none;gap:8px}
+  .filter-wrap input,.filter-wrap select{width:100%;min-height:46px;padding:11px 12px;font-size:14px}
+  .history-list{gap:9px}
+  .history-card{display:grid;grid-template-columns:38px minmax(0,1fr);gap:9px 10px;padding:12px;border-radius:14px}
+  .vehicle-icon{grid-column:1;grid-row:1;width:38px;height:38px;flex-basis:38px}
+  .history-main{grid-column:2;grid-row:1;min-width:0;width:auto}
+  .history-main strong{font-size:12px;line-height:1.4}
+  .history-main p{white-space:normal;font-size:10px;line-height:1.4}
+  .history-meta{grid-column:1/-1;margin:0;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;text-align:left}
+  .history-meta small{font-size:10px;white-space:normal;overflow-wrap:anywhere}
+  .card-actions{grid-column:1/-1;margin:0;width:100%}
+  .mini-btn{width:100%;min-height:42px}
+  .empty-state{padding:30px 14px}
+  .loading-state{padding:15px 12px;font-size:12px}
+}
+@media(max-width:380px){
+  .shell{padding-left:10px;padding-right:10px}
+  .stats-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .stats-grid .stat-card{height:78px;min-height:78px;padding:8px 3px}
+  .stats-grid .stat-card span{font-size:8px}
+  .stats-grid .stat-card strong{font-size:20px}
+  .check-item{grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:11px 8px}
+  .check-item .item-name{font-size:12px}
+  .item-options .choice{width:33px;height:34px;min-width:33px}
+  .item-options .choice span{font-size:17px}
+  .item-options{gap:1px;padding:3px}
+}
+@media(prefers-reduced-motion:reduce){.item-options .choice,.item-options .choice span,.check-item .item-note,.mini-btn,.history-card{transition:none!important;animation:none!important}}
