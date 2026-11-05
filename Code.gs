@@ -23,6 +23,7 @@ function doPost(e) {
       return json_({ ok: true, records: action === "list" ? listRecords_(publicUser, true) : listMetadata_(publicUser) });
     }
     if (action === "get") return json_({ ok: true, record: getRecord_({username:"público",role:"admin"}, payload.id) });
+    if (action === "getPhotos") return json_({ ok: true, photos: getRecordPhotos_({username:"público",role:"admin"}, payload.id) });
     if (action === "publicSave") return json_(publicSave_(payload.record));
     return json_({ ok: false, error: "Ação não reconhecida ou não permitida." });
   } catch (err) {
@@ -186,6 +187,28 @@ function getRecord_(user, id) {
   const row = rows.find(r => String(r[0]) === String(id));
   if (!row || !canUserViewOwner_(user, row[1])) throw new Error("Checklist não encontrado ou sem permissão.");
   return rowToRecord_(row, true);
+}
+
+function getRecordPhotos_(user, id) {
+  if (!id) throw new Error("Checklist não informado.");
+  const sh = ensureSheet_(getSpreadsheet_(), "Checklists", SHEETS.Checklists);
+  if (sh.getLastRow() < 2) throw new Error("Checklist não encontrado.");
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, SHEETS.Checklists.length).getValues();
+  const row = rows.find(r => String(r[0]) === String(id));
+  if (!row || !canUserViewOwner_(user, row[1])) throw new Error("Checklist não encontrado ou sem permissão.");
+  let photoIds = [];
+  try { photoIds = JSON.parse(row[13] || "[]"); } catch (_) {}
+  const photos = [];
+  photoIds.forEach(photoId => {
+    try {
+      const file = DriveApp.getFileById(photoId);
+      const blob = file.getBlob();
+      photos.push({ name:file.getName(), type:blob.getContentType(), data:"data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes()) });
+    } catch (error) {
+      console.warn("Não foi possível carregar a foto " + photoId + ": " + error);
+    }
+  });
+  return photos;
 }
 
 function canUserViewOwner_(user, owner) {

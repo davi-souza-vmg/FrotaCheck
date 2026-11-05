@@ -330,3 +330,9 @@ html,body{max-width:100%;overflow-x:clip}
   .item-options{gap:1px;padding:3px}
 }
 @media(prefers-reduced-motion:reduce){.item-options .choice,.item-options .choice span,.check-item .item-note,.mini-btn,.history-card{transition:none!important;animation:none!important}}
+
+
+/* Gerência: pendências devem ser percebidas imediatamente. */
+.status-pill.has-issues{background:#fee8e7!important;color:#b42318!important;border:1px solid #f3b8b5!important}
+.detail-photo-state{padding:16px;border-top:1px solid #edf2ef;color:#657871;font-size:12px;text-align:center;background:#fbfdfc}
+.detail-photo-state.is-error{color:#b42318;background:#fff7f6}

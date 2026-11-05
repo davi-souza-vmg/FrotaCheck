@@ -165,7 +165,7 @@ function renderHistory(){
     const haystack=[r.formType,r.vehicle,r.destination,r.origin,r.driver].join(" ").toLowerCase();
     return matchesFilter&&haystack.includes(query);
   });
-  listEl.innerHTML=visible.map(r=>`<article class="history-card"><div class="vehicle-icon" aria-hidden="true">▣</div><div class="history-main"><strong>${escapeHtml(r.formType||"Checklist")} · ${escapeHtml(r.vehicle||"Veículo sem prefixo")} · ${escapeHtml(r.destination||"Destino não informado")}</strong><p>${escapeHtml(r.driver||"Conferente")} · ${escapeHtml(r.origin||"Origem não informada")} → ${escapeHtml(r.destination||"")}</p></div><div class="history-meta"><span class="status-pill ${escapeHtml(r.status||"complete")}">${issuesFor(r)>0?"Com pendências":"Finalizado"}</span><small>${displayDateTime(r.dateTime)} · ${Number.isFinite(r.photoCount)?r.photoCount:(r.photos||[]).length} foto(s)</small></div><div class="card-actions"><button class="mini-btn" data-open="${escapeHtml(r.id)}" type="button">Ver detalhes <span aria-hidden="true">→</span></button></div></article>`).join("");
+  listEl.innerHTML=visible.map(r=>`<article class="history-card"><div class="vehicle-icon" aria-hidden="true">▣</div><div class="history-main"><strong>${escapeHtml(r.formType||"Checklist")} · ${escapeHtml(r.vehicle||"Veículo sem prefixo")} · ${escapeHtml(r.destination||"Destino não informado")}</strong><p>${escapeHtml(r.driver||"Conferente")} · ${escapeHtml(r.origin||"Origem não informada")} → ${escapeHtml(r.destination||"")}</p></div><div class="history-meta"><span class="status-pill ${issuesFor(r)>0?"has-issues":escapeHtml(r.status||"complete")}">${issuesFor(r)>0?"Com pendências":"Finalizado"}</span><small>${displayDateTime(r.dateTime)} · ${Number.isFinite(r.photoCount)?r.photoCount:(r.photos||[]).length} foto(s)</small></div><div class="card-actions"><button class="mini-btn" data-open="${escapeHtml(r.id)}" type="button">Ver detalhes <span aria-hidden="true">→</span></button></div></article>`).join("");
   const hasVisible=visible.length>0;
   listEl.hidden=!hasVisible;
   if(loadingEl)loadingEl.hidden=historyHasLoaded;
@@ -175,29 +175,47 @@ function renderHistory(){
 
 async function openDetail(id){
   const summary=records.find(x=>String(x.id)===String(id));
-  if(!summary)return;
-  activeId=id;
+  if(!summary){toast("Este checklist não está disponível na lista atual. Atualize a Gerência e tente novamente.");return;}
+  activeId=String(id);
   showView("detailView");
-  $("detailStatus").className="status-pill";
-  $("detailStatus").textContent="Carregando";
-  $("detailContent").innerHTML='<div class="loading-state">Carregando detalhes do checklist…</div>';
+  // Os metadados da Gerência já contêm identificação, avaliações e observações.
+  // Renderize isso imediatamente; fotos são carregadas separadamente para não travar a tela.
+  renderDetail(summary);
+  if(Number(summary.photoCount||0)>0) loadDetailPhotos(String(id));
+}
+
+async function loadDetailPhotos(id){
+  const area=$("detailPhotoArea");
+  if(!area)return;
+  area.innerHTML='<div class="detail-photo-state">Carregando fotos…</div>';
   try{
-    const response=await apiRequest({action:"get",id});
-    if(!response.record)throw new Error("O checklist não foi encontrado na nuvem.");
-    renderDetail(response.record);
+    const response=await apiRequest({action:"getPhotos",id});
+    if(String(activeId)!==String(id)||$("detailView").hidden)return;
+    const photos=Array.isArray(response.photos)?response.photos:[];
+    area.innerHTML=photos.length
+      ? `<div class="detail-photos">${photos.map((p,i)=>`<img src="${p.data}" alt="${escapeHtml(p.name||"Foto de avaria "+(i+1))}" data-preview-photo tabindex="0" role="button" aria-label="Ampliar foto ${i+1}">`).join("")}</div>`
+      : '<div class="detail-photo-state">Nenhuma foto disponível para este checklist.</div>';
+    bindPhotoPreviews(area);
   }catch(error){
-    console.error("Falha ao abrir checklist:",error);
-    toast("Não foi possível abrir o checklist: "+error.message);
-    showView("appView");
+    console.error("Falha ao carregar fotos do checklist:",error);
+    if(String(activeId)===String(id)&&!$("detailView").hidden){
+      area.innerHTML='<div class="detail-photo-state is-error">Não foi possível carregar as fotos agora. As informações do checklist estão disponíveis acima.</div>';
+    }
   }
 }
+
 function renderDetail(r){
-  activeId=r.id;
-  $("detailStatus").className="status-pill "+(r.status||"complete");
-  $("detailStatus").textContent=statusLabel(r);
+  activeId=String(r.id);
+  const hasIssues=issuesFor(r)>0;
+  $("detailStatus").className="status-pill "+(hasIssues?"has-issues":(r.status||"complete"));
+  $("detailStatus").textContent=hasIssues?"Com pendências":statusLabel(r);
   const groups=GROUPS.map((g,gi)=>({title:g.title,items:g.items.map((name,ii)=>({name,...(r.checks||{})[`g${gi}_${ii}`]}))}));
   groups.push({title:"Itens operacionais",items:OPERATIONAL.map((name,i)=>({name,...(r.checks||{})[`op${i}`]}))});
-  $("detailContent").innerHTML=`<div class="detail-hero"><span class="eyebrow" style="color:#a9d6c5">CHECKLIST DE SAÍDA</span><h1>${escapeHtml(r.vehicle||"Veículo")} · ${escapeHtml(r.destination||"Destino")}</h1><p>${escapeHtml(r.driver||"")} · ${r.dateTime?displayDateTime(r.dateTime):"Data não informada"}</p><button id="downloadPdfBtn" class="pdf-button no-print" type="button" aria-label="Baixar PDF" title="Baixar PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3"/></svg></button></div><div class="detail-grid">${[["Tipo de veículo",r.vehicleType],["KM inicial",r.odometer],["Origem",r.origin],["Destino",r.destination],["Conferente",r.driver],["Atualizado",r.updatedAt?new Date(r.updatedAt).toLocaleString("pt-BR"):"—"]].map(([k,v])=>`<div class="detail-cell"><small>${k}</small><strong>${escapeHtml(v||"—")}</strong></div>`).join("")}</div>${groups.map(g=>`<section class="detail-group"><h3>${escapeHtml(g.title)}</h3>${g.items.map(it=>`<div class="detail-row"><span>${escapeHtml(it.name)}</span><span style="color:${it.value==="bad"?"#a83232":it.value==="ok"?"#237047":"#879690"}">${it.value==="ok"?"OK":it.value==="bad"?"NÃO OK":it.value==="na"?"N/A":"Não avaliado"}${it.note?" · "+escapeHtml(it.note):""}</span></div>`).join("")}</section>`).join("")}<section class="detail-group"><h3>Avarias e observações</h3><div class="detail-row"><span>Descrição</span><span>${escapeHtml(r.damageNotes||"Nenhuma informada")}</span></div><div class="detail-row"><span>Observações</span><span>${escapeHtml(r.generalNotes||"Nenhuma")}</span></div>${r.photos?.length?`<div class="detail-photos">${r.photos.map((p,i)=>`<img src="${p.data}" alt="${escapeHtml(p.name||"Foto de avaria "+(i+1))}" data-preview-photo tabindex="0" role="button" aria-label="Ampliar foto ${i+1}">`).join("")}</div>`:""}</section>`;
+  const photoCount=Number(r.photoCount ?? (Array.isArray(r.photos)?r.photos.length:0))||0;
+  const photoSection=photoCount>0
+    ? `<section class="detail-group"><h3>Fotos anexadas (${photoCount})</h3><div id="detailPhotoArea">${Array.isArray(r.photos)&&r.photos.length?`<div class="detail-photos">${r.photos.map((p,i)=>`<img src="${p.data}" alt="${escapeHtml(p.name||"Foto de avaria "+(i+1))}" data-preview-photo tabindex="0" role="button" aria-label="Ampliar foto ${i+1}">`).join("")}</div>`:'<div class="detail-photo-state">Carregando fotos…</div>'}</div></section>`
+    : "";
+  $("detailContent").innerHTML=`<div class="detail-hero"><span class="eyebrow" style="color:#a9d6c5">CHECKLIST DE SAÍDA</span><h1>${escapeHtml(r.vehicle||"Veículo")} · ${escapeHtml(r.destination||"Destino")}</h1><p>${escapeHtml(r.driver||"")} · ${r.dateTime?displayDateTime(r.dateTime):"Data não informada"}</p><button id="downloadPdfBtn" class="pdf-button no-print" type="button" aria-label="Baixar PDF" title="Baixar PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3"/></svg></button></div><div class="detail-grid">${[["Tipo de veículo",r.vehicleType],["KM inicial",r.odometer],["Origem",r.origin],["Destino",r.destination],["Conferente",r.driver],["Atualizado",r.updatedAt?new Date(r.updatedAt).toLocaleString("pt-BR"):"—"]].map(([k,v])=>`<div class="detail-cell"><small>${k}</small><strong>${escapeHtml(v||"—")}</strong></div>`).join("")}</div>${groups.map(g=>`<section class="detail-group"><h3>${escapeHtml(g.title)}</h3>${g.items.map(it=>`<div class="detail-row"><span>${escapeHtml(it.name)}</span><span style="color:${it.value==="bad"?"#a83232":it.value==="ok"?"#237047":"#879690"}">${it.value==="ok"?"OK":it.value==="bad"?"NÃO OK":it.value==="na"?"N/A":"Não avaliado"}${it.note?" · "+escapeHtml(it.note):""}</span></div>`).join("")}</section>`).join("")}<section class="detail-group"><h3>Avarias e observações</h3><div class="detail-row"><span>Descrição</span><span>${escapeHtml(r.damageNotes||"Nenhuma informada")}</span></div><div class="detail-row"><span>Observações</span><span>${escapeHtml(r.generalNotes||"Nenhuma")}</span></div></section>${photoSection}`;
   bindPhotoPreviews($("detailContent"));
   const pdfBtn=$("downloadPdfBtn");
   if(pdfBtn)pdfBtn.onclick=()=>{document.body.classList.add("printing-report");window.print();setTimeout(()=>document.body.classList.remove("printing-report"),1500);};
@@ -264,8 +282,8 @@ async function refreshCloudChanges(force=false){
     else if(!$("detailView").hidden&&activeStillExists){
       const before=oldById.get(String(activeId)),after=metaById.get(String(activeId));
       if(!before||String(before.updatedAt||"")!==String(after.updatedAt||"")){
-        const full=await apiRequest({action:"get",id:activeId});
-        if(full.record)renderDetail(full.record);
+        renderDetail(after);
+        if(Number(after.photoCount||0)>0)loadDetailPhotos(String(activeId));
       }
     }
     historyHasLoaded=true;

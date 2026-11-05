@@ -114,3 +114,17 @@ Observação: a sincronização automática não é um canal push instantâneo; 
 - As seções agora seguem uma numeração contínua: 01 Identificação, 02 a 07 inspeções, 08 Itens operacionais e 09 Avarias e observações. Os títulos usam o mesmo padrão visual.
 - O layout mobile impede rolagem horizontal, mantém os três indicadores da Gerência alinhados na mesma fileira e simplifica os filtros.
 - Para a atualização rápida da Gerência, publique também o `Code.gs` atualizado. A ação `listMeta` passou a retornar os dados necessários aos cards sem baixar fotos em lote; as fotos continuam sendo obtidas ao abrir um registro. O frontend possui fallback para APIs antigas, mas esse fallback é mais lento.
+
+
+## Correção da etiqueta de pendências e abertura dos detalhes
+
+- A etiqueta **Com pendências** agora usa fundo vermelho claro e texto vermelho, tanto na lista da Gerência quanto no cabeçalho dos detalhes.
+- Ao abrir um checklist, a tela é montada imediatamente com os metadados já recebidos pela lista da Gerência (identificação, respostas e observações). A abertura não aguarda a leitura das imagens no Google Drive.
+- As fotos são solicitadas em uma chamada separada (`getPhotos`). Se a leitura das fotos falhar ou demorar, os dados do checklist continuam disponíveis e a tela informa apenas que as fotos não puderam ser carregadas.
+
+### Publicação desta correção
+
+1. Atualize no GitHub Pages os arquivos `app.js`, `styles.css` e `sw.js` deste pacote.
+2. Substitua o `Code.gs` do Apps Script por este arquivo e publique uma **Nova versão** da implantação Web App. A nova ação `getPhotos` é usada somente para carregar anexos; os detalhes textuais não dependem dela.
+3. Abra a Gerência com `Ctrl + F5` ou reabra o PWA após a publicação.
+4. Abra um checklist sem fotos e outro com fotos para confirmar que as informações aparecem imediatamente; no segundo, as fotos são carregadas depois.
