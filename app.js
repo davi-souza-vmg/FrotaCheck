@@ -1,11 +1,8 @@
-/* FrotaCheck — checklist e consulta com sincronização via Google Apps Script. */
-const STORAGE_KEY = "frotacheck.records.v1";
-const SESSION_KEY = "frotacheck.session.v2";
+/* FrotaCheck — sem rascunhos locais; registros enviados são consultados na nuvem. */
 const API_URL = "https://script.google.com/macros/s/AKfycbzZG4ax6WY_8tDxZpjcz_cvRpEoNLMLSPpPX0EywDqAsj_dni5O0UKgNjTtcqsXTuyATQ/exec";
-let authToken = null;
-let syncQueue = Promise.resolve();
 let refreshInFlight = false;
 let realtimeTimer = null;
+let cloudLoading = false;
 const GROUPS = [
   {title:"Externo (visual geral)",items:["Sem avarias visíveis na lataria","Retrovisores em boas condições","Vidros e para-brisa íntegros","Sem vazamento no chão","Portas funcionando"]},
   {title:"Pneus",items:["Pneus calibrados e sem danos","Rodas firmes","Estepe em boas condições"]},
@@ -27,17 +24,21 @@ const routePath = decodeURIComponent(location.pathname).replace(/\/index\.html$/
 /* /Checklist = criar checklists (conferentes). /Conferencia = consulta de todos os checklists (gerência). */
 const formType = "Checklist";
 const isEntryRoute = routePath.endsWith("/checklist");
+function clearLegacyLocalData(){
+  // Remove only data left by older versions; the current app never stores records or form drafts locally.
+  try{
+    ["frotacheck.records.v1","frotacheck.session.v2","frotacheck.draft.v1:checklist"].forEach(key=>localStorage.removeItem(key));
+  }catch(error){console.warn("Não foi possível limpar dados antigos do FrotaCheck:",error);}
+}
 function showView(id){views.forEach(v=>$(v).hidden=v!==id);window.scrollTo({top:0,behavior:"smooth"});}
 function uid(){return "chk_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8);}
 function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16);}
 function displayDateTime(value){if(!value)return "Sem data";const raw=String(value);const d=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)?new Date(raw):new Date(raw);return Number.isNaN(d.getTime())?"Sem data":d.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}
 function escapeHtml(s=""){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function loadRecords(){try{records=JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]");}catch{records=[];}}
-function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(records));if($("lastSaved")) $("lastSaved").textContent="Salvo neste aparelho às "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});}
 function customConfirm(message,title="Confirmar ação",confirmLabel="Confirmar") { return new Promise(resolve=>{const modal=$("actionConfirmModal");if(!modal){resolve(window.confirm(message));return;}$("actionConfirmTitle").textContent=title;$("actionConfirmMessage").textContent=message;$("actionConfirmYes").textContent=confirmLabel;modal.hidden=false;const finish=value=>{modal.hidden=true;$("actionConfirmYes").onclick=null;$("actionConfirmCancel").onclick=null;resolve(value);};$("actionConfirmYes").onclick=()=>finish(true);$("actionConfirmCancel").onclick=()=>finish(false);});}
 function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),2600);}
 function setConnection(){const online=navigator.onLine;$("offlineBanner").hidden=online;$("connectionState").classList.toggle("offline",!online);$("connectionState").innerHTML=`<i></i>${online?"Online":"Offline"}`;}
-function statusLabel(r){return r.status==="complete"?"Finalizado":r.status==="pending"?"Pendente de envio":"Rascunho";}
+function statusLabel(r){return r.status==="complete"?"Finalizado":r.status==="pending"?"Pendente de envio":"Não enviado";}
 function makeChoices(name,value=""){return `<div class="item-options" role="group" aria-label="Avaliação">${[["bad","✕","Não OK"],["na","/","Não se aplica"],["ok","✓","OK"]].map(([v,glyph,label])=>`<label class="choice choice-${v} ${value===v?"is-selected":""}" title="${label}" aria-label="${label}"><input type="radio" name="${name}" value="${v}" ${value===v?"checked":""}><span>${glyph}</span></label>`).join("")}</div>`;}
 function renderCheckSections(data={}){
   $("checklistSections").innerHTML=`<div class="check-groups">${GROUPS.map((g,gi)=>`<section class="check-group"><div class="group-head">${String(gi+1).padStart(2,"0")} · ${g.title}</div><div class="item-list">${g.items.map((item,ii)=>{const key=`g${gi}_${ii}`,v=data.checks?.[key]||{};return `<div class="check-item"><div class="item-name">${item}</div>${makeChoices(key,v.value)}<div class="item-note"><input data-note="${key}" value="${escapeHtml(v.note||"")}" placeholder="Observação (opcional)"></div></div>`}).join("")}</div></section>`).join("")}</div>`;
@@ -47,7 +48,7 @@ function renderCheckSections(data={}){
 function collectChecks(){const checks={};document.querySelectorAll('#checklistForm input[type="radio"]:checked').forEach(el=>{checks[el.name]??={};checks[el.name].value=el.value;});document.querySelectorAll('#checklistForm [data-note]').forEach(el=>{const key=el.dataset.note;checks[key]??={};checks[key].note=el.value;});return checks;}
 function completedCount(){const checked=document.querySelectorAll('#checklistForm input[type="radio"]:checked').length;const total=document.querySelectorAll('#checklistForm input[type="radio"][value="ok"]').length;return {checked,total};}
 function updateProgress(){const {checked,total}=completedCount();const pct=total?Math.round(checked/total*100):0;$("progressBar").style.width=pct+"%";$("progressText").textContent=pct+"% dos itens avaliados";}
-function formData(){const existing=records.find(x=>x.id===(activeId||""));return {id:activeId||uid(),owner:existing?.owner||"público",formType,driver:$("driver").value,vehicle:$("vehicle").value,vehicleType:$("vehicleType").value,dateTime:$("dateTime").value,odometer:$("odometer").value,origin:$("origin").value,destination:$("destination").value,checks:collectChecks(),damageNotes:$("damageNotes").value,generalNotes:$("generalNotes").value,photos:photos.map(p=>({name:p.name,data:p.data,type:p.type})),status:"draft",updatedAt:new Date().toISOString()};}
+function formData(){return {id:uid(),owner:"público",formType,driver:$("driver").value,vehicle:$("vehicle").value,vehicleType:$("vehicleType").value,dateTime:$("dateTime").value,odometer:$("odometer").value,origin:$("origin").value,destination:$("destination").value,checks:collectChecks(),damageNotes:$("damageNotes").value,generalNotes:$("generalNotes").value,photos:photos.map(p=>({name:p.name,data:p.data,type:p.type})),status:"complete",updatedAt:new Date().toISOString()};}
 function fillForm(r){
   if(r){ openDetail(r.id); return; }
   activeId=null;photos=(r?.photos||[]).slice();
@@ -109,17 +110,48 @@ $("photoPreviewImage").addEventListener("pointercancel",()=>{previewDragging=fal
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("photoPreviewModal").hidden)closePhotoPreview();});
 async function addPhotos(filesList){for(const file of Array.from(filesList)){if(!file.type.startsWith("image/"))continue;try{const data=await compressImage(file);photos.push({name:file.name||"avaria.jpg",type:"image/jpeg",data});}catch{toast("Não foi possível carregar uma das fotos.");}}renderPhotos();}
 function compressImage(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const max=1400,scale=Math.min(1,max/Math.max(img.width,img.height)),canvas=document.createElement("canvas");canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL("image/jpeg",.76));};img.src=reader.result;};reader.readAsDataURL(file);});}
-function saveRecord(status){const r=formData();r.status=status;r.updatedAt=new Date().toISOString();if(status==="complete")r.completedAt=new Date().toISOString();const i=records.findIndex(x=>x.id===r.id);if(i>=0)records[i]=r;else records.unshift(r);activeId=r.id;persist();renderHistory();$("saveState").textContent=status==="complete"?"Finalizado neste aparelho":"Formulário salvo";toast(navigator.onLine?"Salvo neste aparelho; sincronizando…":"Salvo neste aparelho. Será sincronizado quando houver conexão.");r.cloudSynced=false;const savedIndex=records.findIndex(x=>x.id===r.id);if(savedIndex>=0)records[savedIndex].cloudSynced=false;persist();if(navigator.onLine)syncRecord(r);return r;}
-function autoSaveDraft(){}
-function clearLocalDraft(){}
-function clearForm(){
-  activeId=null; photos=[];
-  const form=$("checklistForm");
-  if(form) form.reset();
+async function clearForm(){
+  if(!await customConfirm("Todos os campos preenchidos serão apagados. O formulário não será armazenado neste aparelho.","Limpar formulário","Limpar tudo"))return;
+  const driver=$("driver").value;
+  activeId=null;photos=[];
+  $("checklistForm").reset();
   fillForm(null);
-  if($("saveState")) $("saveState").textContent="";
-  if($("lastSaved")) $("lastSaved").textContent="";
-  toast("Formulário limpo. Nenhum rascunho foi salvo.");
+  $("driver").value=driver;
+  renderPhotos();
+  toast("Formulário limpo.");
+}
+function issuesFor(record){return Object.values(record.checks||{}).filter(item=>item?.value==="bad").length;}
+function renderHistory(){
+  const search=$("historySearch"),filterControl=$("historyFilter"),listEl=$("historyList"),emptyEl=$("emptyHistory");
+  if(!listEl||!emptyEl)return;
+  const query=(search?.value||"").trim().toLowerCase();
+  const filter=filterControl?.value||"all";
+  const all=records.slice().sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
+  const clean=all.filter(r=>issuesFor(r)===0);
+  const withIssues=all.filter(r=>issuesFor(r)>0);
+  if($("statTotal"))$("statTotal").textContent=clean.length;
+  if($("statWithIssues"))$("statWithIssues").textContent=withIssues.length;
+  if($("statIssues"))$("statIssues").textContent=all.length;
+  const statCards=document.querySelectorAll(".stats-grid .stat-card");
+  if(statCards.length===3){
+    statCards[0].querySelector("span").textContent="Sem pendências";
+    statCards[0].querySelector("small").textContent="Finalizados sem itens NÃO OK · clique para filtrar";
+    statCards[1].querySelector("span").textContent="Com pendências";
+    statCards[1].querySelector("small").textContent="Itens marcados como NÃO OK · clique para filtrar";
+    statCards[2].querySelector("span").textContent="Total de checklists";
+    statCards[2].querySelector("small").textContent="Registros enviados à nuvem";
+  }
+  const visible=all.filter(r=>{
+    const matchesFilter=filter==="all"||(filter==="clean"&&issuesFor(r)===0)||(filter==="issues"&&issuesFor(r)>0);
+    const haystack=[r.formType,r.vehicle,r.destination,r.origin,r.driver].join(" ").toLowerCase();
+    return matchesFilter&&haystack.includes(query);
+  });
+  listEl.innerHTML=visible.map(r=>`<article class="history-card"><div class="vehicle-icon">▣</div><div class="history-main"><strong>${escapeHtml(r.formType||"Checklist")} · ${escapeHtml(r.vehicle||"Veículo sem prefixo")} · ${escapeHtml(r.destination||"Destino não informado")}</strong><p>${escapeHtml(r.driver||"Conferente")} · ${escapeHtml(r.origin||"Origem não informada")} → ${escapeHtml(r.destination||"")}</p></div><div class="history-meta"><span class="status-pill ${escapeHtml(r.status||"complete")}">${issuesFor(r)>0?"Com pendências":"Finalizado"}</span><small>${displayDateTime(r.dateTime)} · ${Number.isFinite(r.photoCount)?r.photoCount:(r.photos||[]).length} foto(s)</small></div><div class="card-actions"><button class="mini-btn" data-open="${escapeHtml(r.id)}" type="button">Abrir</button></div></article>`).join("");
+  emptyEl.hidden=visible.length>0;
+  listEl.hidden=visible.length===0;
+  if(search||filterControl){
+    document.querySelectorAll("[data-open]").forEach(button=>button.onclick=()=>openDetail(button.dataset.open));
+  }
 }
 
 function openDetail(id){const r=records.find(x=>x.id===id);if(!r)return;activeId=id;$("detailStatus").className="status-pill "+r.status;$("detailStatus").textContent=statusLabel(r);
@@ -138,84 +170,60 @@ async function apiRequest(payload){
   return data;
 }
 function mergeRecords(incoming){
-  const previous = new Map(records.map(r=>[String(r.id),r]));
-  const next = new Map();
-  (incoming||[]).forEach(cloud=>{
-    const id=String(cloud.id), local=previous.get(id);
-    if(local && local.cloudSynced===false && (local.updatedAt||"")>(cloud.updatedAt||"")){
-      next.set(id,local);
-    }else{
-      cloud.cloudSynced=true;
-      cloud.photoCount=Number.isFinite(cloud.photoCount)?cloud.photoCount:(cloud.photos||[]).length;
-      next.set(id,cloud);
-    }
-  });
-  // Preserve only genuinely local, unsynchronized drafts. Records already on the server
-  // are authoritative, so deleted records disappear from every device.
-  previous.forEach((local,id)=>{
-    if(!next.has(id) && local.cloudSynced===false && local.owner===currentUser?.username) next.set(id,local);
-  });
-  records=Array.from(next.values()).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
-  persist();
-  if(!$("appView").hidden) renderHistory();
-}
-async function syncPendingRecords(){
-  if(!navigator.onLine)return;
-  const pending=records.filter(r=>r.cloudSynced===false).sort((a,b)=>(a.updatedAt||"").localeCompare(b.updatedAt||""));
-  for(const record of pending) await syncRecord(record);
+  records=(Array.isArray(incoming)?incoming:[]).map(record=>({...record,photoCount:Number.isFinite(record.photoCount)?record.photoCount:(record.photos||[]).length}));
+  records.sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
+  if(!$("appView").hidden)renderHistory();
 }
 async function loadCloudRecords(){
-  if(!navigator.onLine)return;
+  if(cloudLoading)return;
+  if(!navigator.onLine){renderHistory();toast("Sem conexão. A consulta depende dos registros na nuvem.");return;}
+  cloudLoading=true;
+  const refreshButton=$("refreshListBtn");
+  if(refreshButton){refreshButton.disabled=true;refreshButton.textContent="Atualizando…";}
   try{
     const data=await apiRequest({action:"list"});
     mergeRecords(data.records||[]);
-    if(!$("appView").hidden) toast("Dados sincronizados com a nuvem.");
-  }catch(err){toast("Não foi possível sincronizar: "+err.message);}
+    if(!$("appView").hidden)toast("Lista atualizada com os registros da nuvem.");
+  }catch(err){
+    console.error("Falha ao carregar checklists da nuvem:",err);
+    toast("Não foi possível carregar os checklists: "+err.message);
+  }finally{
+    cloudLoading=false;
+    if(refreshButton){refreshButton.disabled=false;refreshButton.textContent="Atualizar lista";}
+  }
 }
 async function refreshCloudChanges(force=false){
-  if(refreshInFlight||!navigator.onLine)return;
-  if(!$("formView").hidden)return; // Never overwrite a form while someone is editing it.
+  if(refreshInFlight||cloudLoading||!navigator.onLine)return;
+  if($("formView").hidden===false)return;
   refreshInFlight=true;
   try{
     const data=await apiRequest({action:"listMeta"});
     const meta=Array.isArray(data.records)?data.records:[];
-    const metaById=new Map(meta.map(r=>[String(r.id),r]));
-    const localById=new Map(records.map(r=>[String(r.id),r]));
+    const metaById=new Map(meta.map(item=>[String(item.id),item]));
+    const localById=new Map(records.map(item=>[String(item.id),item]));
     let changed=false;
-    // Remove cloud records that no longer exist, while preserving local unsent drafts.
-    const countBeforeFilter=records.length;
-    records=records.filter(r=>metaById.has(String(r.id)) || (r.cloudSynced===false && r.owner===currentUser?.username));
-    if(records.length!==countBeforeFilter) changed=true;
-    if(!$("detailView").hidden && !metaById.has(String(activeId))){
+    const filtered=records.filter(record=>metaById.has(String(record.id)));
+    if(filtered.length!==records.length){records=filtered;changed=true;}
+    if(!$("detailView").hidden&&!metaById.has(String(activeId))){
       showView("appView");
-      toast("Este checklist foi removido por outro administrador.");
+      toast("Este checklist não está mais disponível.");
     }
-    for(const m of meta){
-      const local=localById.get(String(m.id));
-      const differs=!local ||
-        String(local.updatedAt||"")!==String(m.updatedAt||"") ||
-        Number(local.photoCount ?? (local.photos||[]).length)!==Number(m.photoCount||0) ||
-        String(local.status||"")!==String(m.status||"");
-      if(!differs) continue;
-      if(local && local.cloudSynced===false && (local.updatedAt||"")>(m.updatedAt||"")) continue;
-      const full=await apiRequest({action:"get",id:m.id});
+    for(const metaRecord of meta){
+      const id=String(metaRecord.id),local=localById.get(id);
+      const differs=!local||String(local.updatedAt||"")!==String(metaRecord.updatedAt||"")||Number(local.photoCount??(local.photos||[]).length)!==Number(metaRecord.photoCount||0)||String(local.status||"")!==String(metaRecord.status||"");
+      if(!differs)continue;
+      const full=await apiRequest({action:"get",id});
       if(full.record){
-        full.record.cloudSynced=true;
         full.record.photoCount=Number.isFinite(full.record.photoCount)?full.record.photoCount:(full.record.photos||[]).length;
-        const idx=records.findIndex(r=>String(r.id)===String(m.id));
-        if(idx>=0) records[idx]=full.record; else records.push(full.record);
+        const index=records.findIndex(record=>String(record.id)===id);
+        if(index>=0)records[index]=full.record;else records.push(full.record);
         changed=true;
       }
     }
     records.sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
-    if(changed || force){
-      persist();
-      if(!$("appView").hidden) renderHistory();
-      if(changed && !$("appView").hidden) toast("Checklist atualizado com as alterações da equipe.");
-    }
-  }catch(err){
-    console.warn("Sincronização automática:",err);
-  }finally{refreshInFlight=false;}
+    if(changed||force){if(!$("appView").hidden)renderHistory();if(changed&&!$("appView").hidden)toast("Lista atualizada com as alterações da equipe.");}
+  }catch(err){console.warn("Atualização da lista:",err);}
+  finally{refreshInFlight=false;}
 }
 function startRealtimeSync(){
   if(realtimeTimer) clearInterval(realtimeTimer);
@@ -225,43 +233,9 @@ function startRealtimeSync(){
     }
   },5000);
 }
-function syncRecord(record){
-  if(!navigator.onLine)return Promise.resolve();
-  syncQueue=syncQueue.then(()=>syncRecordNow(record)).catch(err=>{console.error("Fila de sincronização:",err);});
-  return syncQueue;
-}
-async function syncRecordNow(record){
-  if(!navigator.onLine)return;
-  try{
-    const data=await apiRequest({action:"publicSave",record:record});
-    if(data.ok){
-      const idx=records.findIndex(r=>r.id===record.id);
-      if(idx>=0){
-        const current=records[idx];
-        if((current.updatedAt||"")<=(record.updatedAt||"")){
-          current.status=record.status;
-          current.cloudSynced=true;
-          current.updatedAt=record.updatedAt;
-          current.photoCount=(record.photos||[]).length;
-        }else{
-          current.cloudSynced=false; // A newer local edit still needs to be sent.
-        }
-        persist();
-      }
-      $("saveState").textContent=record.status==="complete"?"Finalizado e sincronizado":"Formulário sincronizado";
-      toast("Checklist sincronizado com a planilha.");
-      setTimeout(()=>refreshCloudChanges(true),300);
-    }
-  }catch(err){
-    console.error(err);
-    toast("Salvo localmente; sincronização pendente: "+err.message);
-  }
-}
-
-
 $("detailBack").onclick=()=>{showView("appView");renderHistory();};
 
-$("finishBtn").onclick=async()=>{if(!await customConfirm("Depois de enviar, este checklist será registrado para consulta da gerência. Confira os dados antes de continuar.","Enviar formulário","Enviar agora"))return;const required=["driver","vehicle","dateTime","odometer","origin","destination"];for(const id of required){if(!$(id).value.trim()){ $(id).focus();toast("Preencha os campos obrigatórios antes de finalizar.");return;}}const missing=document.querySelectorAll('#checklistForm input[type="radio"][value="ok"]').length-document.querySelectorAll('#checklistForm input[type="radio"]:checked').length;if(missing>0&&!await customConfirm(`Ainda há ${missing} item(ns) sem avaliação. Deseja finalizar mesmo assim?`,"Itens sem avaliação","Finalizar mesmo assim"))return;const issues=Object.values(collectChecks()).filter(c=>c.value==="bad").length;if(issues&&!await customConfirm(`Foram marcados ${issues} item(ns) como NÃO OK. Confirma a finalização e o registro das não conformidades?`,"Itens com pendência","Confirmar envio"))return;const submitted=formData();submitted.status="complete";submitted.completedAt=new Date().toISOString();submitted.updatedAt=new Date().toISOString();const button=$("finishBtn");button.disabled=true;button.innerHTML='<span class="spinner"></span> Enviando formulário…';document.body.classList.add("is-sending");apiRequest({action:"publicSave",record:submitted}).then(()=>{document.body.classList.remove("is-sending");toast("Formulário enviado! Preparando um novo formulário…");const savedDriver=$("driver").value;activeId=null;photos=[];$("checklistForm").reset();fillForm(null);$("driver").value=savedDriver;button.disabled=false;button.innerHTML='Enviar formulário <span>→</span>';window.scrollTo({top:0,behavior:"smooth"});}).catch(err=>{document.body.classList.remove("is-sending");toast("Não foi possível enviar: "+err.message);button.disabled=false;button.innerHTML="Enviar formulário <span>→</span>";});};
+$("finishBtn").onclick=async()=>{if(!await customConfirm("Depois de enviar, este checklist será registrado para consulta da gerência. Confira os dados antes de continuar.","Enviar formulário","Enviar agora"))return;const required=["driver","vehicle","dateTime","odometer","origin","destination"];for(const id of required){if(!$(id).value.trim()){ $(id).focus();toast("Preencha os campos obrigatórios antes de finalizar.");return;}}const missing=document.querySelectorAll('#checklistForm input[type="radio"][value="ok"]').length-document.querySelectorAll('#checklistForm input[type="radio"]:checked').length;if(missing>0&&!await customConfirm(`Ainda há ${missing} item(ns) sem avaliação. Deseja finalizar mesmo assim?`,"Itens sem avaliação","Finalizar mesmo assim"))return;const issues=Object.values(collectChecks()).filter(c=>c.value==="bad").length;if(issues&&!await customConfirm(`Foram marcados ${issues} item(ns) como NÃO OK. Confirma a finalização e o registro das não conformidades?`,"Itens com pendência","Confirmar envio"))return;const submitted=formData();submitted.status="complete";submitted.completedAt=new Date().toISOString();submitted.updatedAt=new Date().toISOString();const button=$("finishBtn");button.disabled=true;button.innerHTML='<span class="spinner"></span> Enviando formulário…';document.body.classList.add("is-sending");apiRequest({action:"publicSave",record:submitted}).then(()=>{document.body.classList.remove("is-sending");toast("Checklist enviado e registrado na nuvem. Preparando um novo formulário…");const savedDriver=$("driver").value;activeId=null;photos=[];$("checklistForm").reset();fillForm(null);$("driver").value=savedDriver;button.disabled=false;button.innerHTML='Enviar formulário <span>→</span>';window.scrollTo({top:0,behavior:"smooth"});}).catch(err=>{document.body.classList.remove("is-sending");toast("Não foi possível enviar. Verifique a conexão e tente novamente: "+err.message);button.disabled=false;button.innerHTML="Enviar formulário <span>→</span>";});};
 $("photoInput").addEventListener("change",e=>{addPhotos(e.target.files);e.target.value="";});
 /* Adicionar fotos: no celular pergunta Câmera ou Arquivos; no computador abre direto a escolha de arquivos */
 (function(){
@@ -280,17 +254,16 @@ $("photoInput").addEventListener("change",e=>{addPhotos(e.target.files);e.target
 })();
 if($("clearFormBtn")) $("clearFormBtn").onclick=clearForm;
 if($("refreshListBtn")) $("refreshListBtn").onclick=()=>loadCloudRecords();
-const statCards=document.querySelectorAll(".stats-grid .stat-card"); if(statCards[0])statCards[0].onclick=()=>{$("historyFilter").value="draft";renderHistory();};if(statCards[1])statCards[1].onclick=()=>{$("historyFilter").value="pending";renderHistory();};if(statCards[2])statCards[2].onclick=()=>{$("historyFilter").value="all";renderHistory();};
-$("historySearch").addEventListener("input",renderHistory);$("historyFilter").addEventListener("change",renderHistory);
-$("checklistForm").addEventListener("change",()=>{updateProgress();});
-$("checklistForm").addEventListener("input",autoSaveDraft);
+const statCards=document.querySelectorAll(".stats-grid .stat-card"); if(statCards[0])statCards[0].onclick=()=>{$("historyFilter").value="clean";renderHistory();};if(statCards[1])statCards[1].onclick=()=>{$("historyFilter").value="issues";renderHistory();};if(statCards[2])statCards[2].onclick=()=>{$("historyFilter").value="all";renderHistory();};
+if($("historySearch"))$("historySearch").addEventListener("input",renderHistory);if($("historyFilter"))$("historyFilter").addEventListener("change",renderHistory);
+$("checklistForm").addEventListener("change",updateProgress);
 
-window.addEventListener("online",async()=>{setConnection();await syncPendingRecords();await loadCloudRecords();await refreshCloudChanges(true);});
+window.addEventListener("online",async()=>{setConnection();await loadCloudRecords();await refreshCloudChanges(true);});
 window.addEventListener("offline",setConnection);
 window.addEventListener("focus",()=>{refreshCloudChanges(true);});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshCloudChanges(true);});
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
-loadRecords();setConnection();startRealtimeSync();
+clearLegacyLocalData();setConnection();if(!isEntryRoute)startRealtimeSync();
 currentUser={username:"público",name:"Conferente",role:"admin",roleLabel:"Consulta pública"};
 if(isEntryRoute){
   $("appView").hidden=true;
@@ -300,6 +273,7 @@ if(isEntryRoute){
   $("formTitle").textContent="Novo formulário · "+formType;
 }else{
   showView("appView");
-  renderHistory(); // Mostra imediatamente os últimos registros em cache.
+  records=[];
+  renderHistory();
   loadCloudRecords();
 }

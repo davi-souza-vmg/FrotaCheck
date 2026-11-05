@@ -28,11 +28,11 @@
       </div>
       <div class="stats-grid">
         <article class="stat-card"><span>Tudo certo</span><strong id="statTotal">0</strong><small>Finalizados sem pendências</small></article>
-        <article class="stat-card"><span>Com pendências</span><strong id="statDrafts">0</strong><small>Itens marcados como NÃO OK</small></article>
+        <article class="stat-card"><span>Com pendências</span><strong id="statWithIssues">0</strong><small>Itens marcados como NÃO OK</small></article>
         <article class="stat-card"><span>Total de checklists</span><strong id="statIssues">0</strong><small>Todos os registros recebidos</small></article>
       </div>
       <div class="content-heading"><div><h2>Todos os formulários</h2><p class="muted">Formulários enviados à nuvem.</p></div>
-        <div class="filter-wrap"><input id="historySearch" placeholder="Buscar veículo, destino..." aria-label="Buscar no histórico"><select id="historyFilter" aria-label="Filtrar histórico"><option value="all">Todos</option><option value="draft">Rascunhos</option><option value="pending">Pendentes de envio</option><option value="complete">Finalizados</option></select></div>
+        <div class="filter-wrap"><input id="historySearch" placeholder="Buscar veículo, destino..." aria-label="Buscar no histórico"><select id="historyFilter" aria-label="Filtrar histórico"><option value="all">Todos</option><option value="clean">Sem pendências</option><option value="issues">Com pendências</option></select></div>
       </div>
       <div id="historyList" class="history-list"></div>
       <div id="emptyHistory" class="empty-state"><div class="empty-icon">▤</div><h3>Nenhum checklist por aqui</h3><p>Comece registrando a próxima saída do veículo.</p><button class="btn btn-primary" id="emptyNewBtn">Atualizar lista</button></div>
@@ -73,7 +73,7 @@
     </section>
 
     <section id="detailView" hidden>
-      <div class="form-top"><button id="detailBack" class="back-button">← Histórico</button><div id="detailStatus" class="status-pill"></div></div>
+      <div class="form-top"><button id="detailBack" class="back-button">← Lista de checklists</button><div id="detailStatus" class="status-pill"></div></div>
       <div id="detailContent"></div>
     </section>
   </main>

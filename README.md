@@ -75,14 +75,13 @@ Envie `index.html`, `styles.css`, `app.js`, `manifest.webmanifest` e `sw.js` par
 ## 4. Como funciona
 
 - O login é validado pelo Apps Script usando `USERS_JSON`.
-- Rascunhos são guardados localmente enquanto a pessoa trabalha, inclusive sem internet.
-- Ao salvar/finalizar com conexão, o app tenta sincronizar o checklist com a planilha e as fotos com o Drive.
-- O histórico da nuvem é carregado após entrar. O armazenamento local continua servindo como cópia de trabalho offline.
-- Se a sincronização falhar, o app avisa que o registro ficou localmente e precisa ser sincronizado novamente. Não considere o registro compartilhado até aparecer a confirmação de sincronização.
+- O checklist é mantido apenas em memória enquanto a tela está aberta. Não existe salvamento automático, rascunho local ou fila offline.
+- Ao enviar, o app grava diretamente na planilha e envia as fotos ao Drive. A confirmação só aparece quando o Apps Script responde com sucesso.
+- Se não houver conexão ou o envio falhar, o registro não é guardado neste aparelho; será necessário manter a tela aberta e tentar enviar novamente. Ao atualizar ou fechar a página, os dados ainda não enviados são descartados.
+- A tela Conferência consulta os registros diretamente na nuvem. Os registros recebidos ficam apenas na memória da página e são carregados novamente ao abrir ou atualizar.
 
 ## Observações importantes
 
-- A primeira versão da integração envia fotos ao Drive quando o usuário clica em salvar rascunho ou finalizar; fotos são comprimidas no navegador. Evite muitas fotos grandes no mesmo checklist.
 - Apps Script pode aplicar limites de execução, armazenamento e chamadas. Teste com registros fictícios antes de usar operacionalmente.
 - Como o frontend está no GitHub Pages e o backend em outro domínio, o navegador pode bloquear chamadas por CORS dependendo do redirecionamento da implantação do Apps Script. Se aparecer erro de rede/CORS no login, primeiro confirme que a implantação está ativa e acessível e que a URL `/macros/s/.../exec` corresponde à versão publicada. A URL `/a/macros/<domínio>/s/.../exec` é específica do domínio Google Workspace e pode redirecionar de forma incompatível com `fetch`. Se ainda houver CORS, a correção robusta é hospedar a interface no Apps Script usando `google.script.run` ou colocar uma API intermediária com CORS configurado; não contorne isso tornando os dados públicos.
 - Faça um teste completo: login válido e inválido, salvar checklist, anexar foto, atualizar página, entrar de novo e confirmar que o registro voltou da nuvem.
@@ -90,12 +89,9 @@ Envie `index.html`, `styles.css`, `app.js`, `manifest.webmanifest` e `sw.js` par
 
 ## Atualização automática e visualização de fotos
 
-Esta versão combina três formas de sincronização:
-- consulta automática de alterações a cada 5 segundos enquanto o painel ou um checklist aberto estiver visível;
-- atualização imediata ao voltar para a aba/janela do FrotaCheck;
-- sincronização após salvar, criar ou excluir um checklist e quando a conexão retorna.
+Esta versão atualiza os registros da nuvem automaticamente a cada 5 segundos enquanto o painel de Conferência estiver visível e ao voltar para a aba/janela do FrotaCheck. Ao retornar a conexão, a lista é carregada novamente. O formulário de Checklist não é salvo nem sincronizado em segundo plano.
 
-A consulta periódica busca primeiro apenas metadados. Somente os checklists novos ou alterados têm seus detalhes e fotos carregados, reduzindo o tráfego e as leituras desnecessárias no Google Drive. Enquanto o formulário está aberto para edição, a atualização automática pausa para não sobrescrever o que a pessoa está digitando.
+A consulta periódica busca primeiro apenas metadados. Somente os checklists novos ou alterados têm seus detalhes e fotos carregados, reduzindo o tráfego e as leituras desnecessárias no Google Drive. Enquanto o formulário está aberto, a consulta automática de alterações pausa. Nenhum conteúdo digitado é enviado antes do clique em Enviar formulário.
 
 As fotos do formulário e da visualização do checklist podem ser clicadas para abrir uma galeria ampliada. O preview oferece zoom por botões ou roda do mouse, botão para ajustar à tela, arraste quando ampliado e fechamento pelo botão ou tecla Esc.
 
@@ -105,6 +101,6 @@ As fotos do formulário e da visualização do checklist podem ser clicadas para
 2. No projeto Apps Script, substitua o `Code.gs` pelo arquivo atualizado.
 3. Salve e publique uma **Nova versão** da implantação existente do Web App.
 4. Abra o FrotaCheck e use `Ctrl + F5`. Se estiver instalado como PWA e continuar exibindo a versão anterior, feche e abra o aplicativo novamente.
-5. Teste com dois usuários: crie um checklist em uma sessão e confirme que aparece na outra; exclua um checklist como administrador e confirme que desaparece na outra sessão em poucos segundos.
+5. Teste o envio de um checklist, confirme que aparece na tela Conferência e atualize a página para verificar que ele é recuperado da nuvem. Depois, teste o fluxo também em um celular.
 
 Observação: a sincronização automática não é um canal push instantâneo; consulta o Apps Script a cada 5 segundos. A latência depende da conexão, do tempo de resposta do Apps Script e das cotas do Google.
