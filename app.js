@@ -25,9 +25,10 @@ let photos = [];
 let currentUser = null;
 const $ = id => document.getElementById(id);
 const views = ["appView","formView","detailView"];
-const routePath = decodeURIComponent(location.pathname).replace(/\/+$/, "").toLowerCase();
-const formType = routePath.endsWith("/conferencia") ? "Conferência" : "Checklist";
-const isEntryRoute = routePath.endsWith("/checklist") || routePath.endsWith("/conferencia");
+const routePath = decodeURIComponent(location.pathname).replace(/\/index\.html$/i, "").replace(/\/+$/, "").toLowerCase();
+/* /Checklist = criar checklists (conferentes). /Conferencia = consulta de todos os checklists (gerência). */
+const formType = "Checklist";
+const isEntryRoute = routePath.endsWith("/checklist");
 function showView(id){views.forEach(v=>$(v).hidden=v!==id);window.scrollTo({top:0,behavior:"smooth"});}
 function uid(){return "chk_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8);}
 function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16);}

@@ -16,7 +16,7 @@
 <body>
   <div id="offlineBanner" class="offline-banner" hidden>Você está offline. Os rascunhos ficam salvos neste aparelho.</div>
   <header class="topbar">
-    <div class="brand"><div class="brand-mark"><img src="../icons/icon-192.png" alt=""></div><div><strong>FrotaCheck</strong><small>Inspeção de saída</small></div></div>
+    <div class="brand"><div class="brand-mark"><img src="../icons/icon-192.png" alt=""></div><div><strong>FrotaCheck</strong><small>Consulta da gerência</small></div></div>
     <div class="header-right"><span id="connectionState" class="connection"><i></i> Online</span></div>
   </header>
 
@@ -32,10 +32,10 @@
         <article class="stat-card"><span>Total de checklists</span><strong id="statIssues">0</strong><small>Todos os registros recebidos</small></article>
       </div>
       <div class="content-heading"><div><h2>Todos os formulários</h2><p class="muted">Registros salvos neste dispositivo e enviados à nuvem.</p></div>
-        <div class="filter-wrap"><input id="historySearch" placeholder="Buscar veículo, destino..." aria-label="Buscar no histórico"><select id="historyFilter" aria-label="Filtrar histórico"><option value="all">Todos</option><option value="draft">Rascunhos</option><option value="pending">Pendentes de envio</option><option value="complete">Finalizados</option></select></div>
+        <div class="filter-wrap"><input id="historySearch" placeholder="Buscar veículo, destino..." aria-label="Buscar no histórico"><select id="historyFilter" aria-label="Filtrar histórico"><option value="all">Todos</option><option value="draft">Tudo certo</option><option value="pending">Com pendências</option><option value="complete">Finalizados</option></select></div>
       </div>
       <div id="historyList" class="history-list"></div>
-      <div id="emptyHistory" class="empty-state"><div class="empty-icon">▤</div><h3>Nenhum checklist por aqui</h3><p>Comece registrando a próxima saída do veículo.</p><button class="btn btn-primary" id="emptyNewBtn">Atualizar lista</button></div>
+      <div id="emptyHistory" class="empty-state"><div class="empty-icon">▤</div><h3>Nenhum checklist por aqui</h3><p>Quando os conferentes enviarem os formulários, eles aparecem aqui.</p><button class="btn btn-primary" id="refreshListBtn">Atualizar lista</button></div>
     </section>
 
     <section id="formView" hidden>

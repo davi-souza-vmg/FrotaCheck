@@ -2,6 +2,12 @@
 
 Aplicação responsiva para equipe interna registrar inspeções de saída de ônibus, micro-ônibus e vans. O frontend fica no GitHub Pages; autenticação e dados sincronizados usam Google Apps Script, Google Sheets e Google Drive.
 
+## Páginas
+
+- `/` (raiz): menu inicial com os dois acessos.
+- `/Checklist/`: página dos conferentes — cria e envia novos checklists (com fotos das avarias).
+- `/Conferencia/`: página da gerência — consulta de todos os checklists enviados (lista, detalhes, fotos e PDF).
+
 ## Arquivos
 
 - `index.html`, `styles.css`, `app.js`: interface e lógica do navegador.

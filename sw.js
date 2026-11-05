@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-const CACHE_NAME = "frotacheck-v20261105-1239";
-=======
-const CACHE_NAME = "frotacheck-v20261027d";
->>>>>>> 2b59647ce4303da607e317201a4b6304da0e77df
+const CACHE_NAME = "frotacheck-v20261105-1311";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./favicon.ico", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/favicon-32.png", "./icons/favicon-16.png", "./icons/apple-touch-icon.png"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
