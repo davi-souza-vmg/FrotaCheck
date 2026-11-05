@@ -286,6 +286,7 @@ currentUser={username:"público",name:"Conferente",role:"admin",roleLabel:"Consu
 if(isEntryRoute){
   $("appView").hidden=true;
   fillForm(null);
+  showView("formView");
   document.querySelector(".form-heading .eyebrow").textContent=formType.toUpperCase();
   $("formTitle").textContent="Novo formulário · "+formType;
 }else{
