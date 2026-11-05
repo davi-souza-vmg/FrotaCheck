@@ -6,7 +6,7 @@
  */
 const SESSION_TTL_SECONDS = 21600; // 6 horas
 const SHEETS = {
-  Checklists: ["id","owner","status","dateTime","driver","vehicle","vehicleType","odometer","origin","destination","checksJson","damageNotes","generalNotes","photoIdsJson","updatedAt","completedAt","formType"]
+  Checklists: ["id","owner","status","dateTime","driver","vehicle","vehicleType","odometer","origin","destination","checksJson","damageNotes","generalNotes","photoIdsJson","updatedAt","completedAt","formType","plate"]
 };
 
 function doGet() {
@@ -112,7 +112,7 @@ function saveRecord_(user, record) {
     photoIds.push(file.getId());
   });
   const now = new Date().toISOString();
-  const values = [String(record.id), owner, String(record.status || "complete"), String(record.dateTime || ""), String(record.driver || ""), String(record.vehicle || ""), String(record.vehicleType || ""), String(record.odometer || ""), String(record.origin || ""), String(record.destination || ""), JSON.stringify(record.checks || {}), String(record.damageNotes || ""), String(record.generalNotes || ""), JSON.stringify(photoIds), String(record.updatedAt || now), String(record.completedAt || ""), String(record.formType || "Checklist")];
+  const values = [String(record.id), owner, String(record.status || "complete"), String(record.dateTime || ""), String(record.driver || ""), String(record.vehicle || ""), String(record.vehicleType || ""), String(record.odometer || ""), String(record.origin || ""), String(record.destination || ""), JSON.stringify(record.checks || {}), String(record.damageNotes || ""), String(record.generalNotes || ""), JSON.stringify(photoIds), String(record.updatedAt || now), String(record.completedAt || ""), String(record.formType || "Checklist"), String(record.plate || "")];
   if (rowNumber) sh.getRange(rowNumber, 1, 1, values.length).setValues([values]);
   else sh.appendRow(values);
   return { ok: true, id: record.id, owner: owner, updatedAt: now };
@@ -174,7 +174,7 @@ function listMetadata_(user) {
       odometer:String(r[7] || ""), origin:String(r[8] || ""), destination:String(r[9] || ""),
       checks:checks, damageNotes:String(r[11] || ""), generalNotes:String(r[12] || ""),
       photoCount:photoIds.length, updatedAt:String(r[14] || ""), completedAt:String(r[15] || ""),
-      formType:String(r[16] || "Checklist")
+      formType:String(r[16] || "Checklist"), plate:String(r[17] || "")
     };
   }).sort((a,b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
@@ -233,7 +233,7 @@ function rowToRecord_(r, includePhotos) {
     driver:String(r[4] || ""), vehicle:String(r[5] || ""), vehicleType:String(r[6] || ""),
     odometer:String(r[7] || ""), origin:String(r[8] || ""), destination:String(r[9] || ""),
     checks:checks, damageNotes:String(r[11] || ""), generalNotes:String(r[12] || ""),
-    photos:photos, photoCount:photoIds.length, updatedAt:String(r[14] || ""), completedAt:String(r[15] || ""), formType:String(r[16] || "Checklist")
+    photos:photos, photoCount:photoIds.length, updatedAt:String(r[14] || ""), completedAt:String(r[15] || ""), formType:String(r[16] || "Checklist"), plate:String(r[17] || "")
   };
 }
 

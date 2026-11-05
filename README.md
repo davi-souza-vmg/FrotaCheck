@@ -145,3 +145,20 @@ Observação: a sincronização automática não é um canal push instantâneo; 
 - O título principal de cada registro na lista mostra somente o veículo/prefixo; a linha abaixo mantém conferente e trajeto.
 - O filtro manual por status foi removido. A lista usa somente o campo de busca, que pesquisa veículo, prefixo, destino, origem e conferente.
 - Cada envio recebe um ID próprio. Portanto, vários checklists podem ser registrados para o mesmo veículo; um novo envio não substitui o anterior por ter o mesmo prefixo.
+
+
+## Mapa vetorial interativo do ônibus na Gerência
+
+- Abaixo do cabeçalho **CHECKLIST DE SAÍDA**, a visualização dos detalhes agora mostra um ônibus em SVG com alternância entre **Frente**, **Lateral** e **Traseira**.
+- Os itens marcados como **Não conforme** que correspondem a componentes externos são representados por marcadores vermelhos clicáveis. Ao selecionar um marcador, a tela exibe o item e sua observação.
+- A lista de registros de avaria também permite navegar para a vista e o marcador correspondente.
+- O prefixo do veículo é aplicado na lateral do ônibus, antes da roda dianteira. A placa é mostrada nas vistas frontal e traseira. O desenho lateral usa a marca VMG fornecida, incluída em `icons/vmg-logo.jpg`.
+- Foi acrescentado o campo opcional **Placa** à identificação do formulário. A coluna `plate` é adicionada ao final da aba `Checklists`, preservando a ordem e os dados das colunas já existentes. Os checklists antigos, sem placa registrada, continuam abrindo normalmente e exibem **PLACA NÃO INFORMADA** no desenho.
+- Itens não conformes de sistemas sem uma região externa inequívoca continuam listados no mapa, mas são separados em **Não aparecem na carroceria** para não atribuir uma localização falsa. A descrição livre de avarias é posicionada de forma aproximada quando identifica frente, lateral ou traseira; fotos não são automaticamente localizadas no ônibus.
+
+### Publicação do mapa interativo
+
+1. Atualize o GitHub Pages com `Checklist/index.html`, `Conferencia/index.html`, `app.js`, `styles.css` e `sw.js` deste pacote.
+2. No Google Apps Script, atualize `Code.gs`, salve e publique uma **Nova versão** da implantação Web App. A coluna **plate** é criada automaticamente no fim da aba `Checklists` quando `setupSheets()` ou uma gravação/listagem é executada; não apague nem reorganize as colunas antigas.
+3. Abra um checklist novo e informe a placa no campo opcional **Placa** para que ela apareça no desenho. Registros antigos continuam compatíveis, mas não terão placa até que o dado exista no registro.
+4. Na Gerência, abra um registro com Não conformidades e teste os três botões de vista e os marcadores vermelhos. A visualização usa as respostas já existentes; não modifica nem recalcula os dados enviados.
